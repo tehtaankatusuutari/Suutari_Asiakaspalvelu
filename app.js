@@ -485,14 +485,40 @@ function nextWhatsappNumber(){
   return "W" + next;
 }
 
+// Myymälä (walk-in) customers are usually logged under their receipt
+// number instead of a name — same idea as nextWhatsappNumber() above, but
+// for plain numeric names. Uses the most recently created numeric name
+// (not the highest one ever typed) so one old typo — e.g. an extra digit
+// from months ago — can't permanently throw off the suggestion; ties break
+// on the job's sequence number. No history yet means no sensible next
+// number, so this stays blank rather than guessing a starting point.
+function nextReceiptNumber(){
+  const candidates = jobs
+    .map(j => {
+      const m = /^(\d+)$/.exec(String(j.name || "").trim());
+      if(!m) return null;
+      return { num: +m[1], created: j.created_at || "", idNum: parseInt(String(j.id).replace("#",""), 10) || 0 };
+    })
+    .filter(Boolean);
+  if(!candidates.length) return "";
+  candidates.sort((a,b) => b.created.localeCompare(a.created) || b.idNum - a.idNum);
+  return String(candidates[0].num + 1);
+}
+
+// Re-suggests the Asiakas field's value when the Lähde toggle changes,
+// but only while that value is still the machine-suggested one (tracked via
+// data-auto — cleared the moment staff types, see the field's oninput) —
+// so switching source never clobbers a name/number someone already typed.
 function toggleWhatsappTracking(){
   const source = document.getElementById("source")?.value;
   const field = document.getElementById("whatsappTrackingField");
   if(field) field.style.display = source === "whatsapp" ? "block" : "none";
-  if(source === "whatsapp"){
-    const nameEl = document.getElementById("n");
-    if(nameEl && !nameEl.value.trim()) nameEl.value = nextWhatsappNumber();
-  }
+  const nameEl = document.getElementById("n");
+  if(!nameEl) return;
+  const isAutoFilled = !nameEl.value.trim() || nameEl.dataset.auto === "1";
+  if(!isAutoFilled) return;
+  nameEl.value = source === "whatsapp" ? nextWhatsappNumber() : nextReceiptNumber();
+  nameEl.dataset.auto = "1";
 }
 
 function openIntake(prefill=null){
@@ -532,7 +558,7 @@ function openIntake(prefill=null){
       <option value="done">✔ Toimitettu</option>
     </select>
   </div>
-  <div class="field"><label>Asiakas</label><input id="n" value="${prefill?.name||""}" placeholder="Nimi"></div>
+  <div class="field"><label>Asiakas</label><input id="n" value="${prefill?.name||""}" placeholder="Nimi tai kuitin numero" oninput="delete this.dataset.auto"></div>
   <div class="field"><label>Puhelin</label><input id="p" value="${prefill?.phone||""}" placeholder="040..."></div>
   <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()"></div>
   <div class="field"><label>Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
