@@ -809,12 +809,12 @@ function finDateToIso(str){
 // capacity guideline (see calendarDensityClass) — so intake doesn't default
 // to stacking every new job onto whatever day is already busiest.
 function suggestDeliveryDate(){
-  const counts = jobCountsByDate();
+  const stats = jobStatsByDate();
   const d = new Date();
   d.setDate(d.getDate() + 2);
   for(let i=0; i<60; i++){
     const dateStr = `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
-    const count = counts[dateStr] || 0;
+    const count = stats[dateStr]?.count || 0;
     if(count <= 4) return { iso: localISO(d), fin: dateStr, count };
     d.setDate(d.getDate()+1);
   }
@@ -1444,10 +1444,15 @@ function calendarDensityClass(count){
   return "cal-over";
 }
 
-function jobCountsByDate(){
-  const counts = {};
-  jobs.forEach(j=>{ if(j.date) counts[j.date] = (counts[j.date]||0) + 1; });
-  return counts;
+function jobStatsByDate(){
+  const stats = {};
+  jobs.forEach(j=>{
+    if(!j.date) return;
+    if(!stats[j.date]) stats[j.date] = { count: 0, amount: 0 };
+    stats[j.date].count += 1;
+    stats[j.date].amount += Number(j.price) || 0;
+  });
+  return stats;
 }
 
 function renderCalendar(){
@@ -1459,19 +1464,26 @@ function renderCalendar(){
   let leadingBlanks = firstOfMonth.getDay() - 1; // week starts on Monday
   if(leadingBlanks < 0) leadingBlanks = 6;
   const daysInMonth = new Date(calendarViewYear, calendarViewMonth+1, 0).getDate();
-  const counts = jobCountsByDate();
+  const stats = jobStatsByDate();
   const now = new Date();
   const todayStr = `${String(now.getDate()).padStart(2,"0")}.${String(now.getMonth()+1).padStart(2,"0")}.${now.getFullYear()}`;
 
-  let html = "";
+  let html = "", monthCount = 0, monthAmount = 0;
   for(let i=0;i<leadingBlanks;i++) html += '<div class="day empty"></div>';
   for(let d=1; d<=daysInMonth; d++){
     const dateStr = `${String(d).padStart(2,"0")}.${String(calendarViewMonth+1).padStart(2,"0")}.${calendarViewYear}`;
-    const count = counts[dateStr] || 0;
+    const s = stats[dateStr] || { count: 0, amount: 0 };
+    monthCount += s.count;
+    monthAmount += s.amount;
     const isToday = dateStr === todayStr;
-    html += `<div class="day ${isToday?"today":""} ${calendarDensityClass(count)}" onclick="openCalendarDay('${dateStr}')"><strong>${d}</strong>${count?`<span class="cal-count">${count}</span>`:""}</div>`;
+    html += `<div class="day ${isToday?"today":""} ${calendarDensityClass(s.count)}" onclick="openCalendarDay('${dateStr}')"><strong>${d}</strong>${s.count?`<div class="cal-info"><span class="cal-count">${s.count}</span><span class="cal-amount">€${s.amount}</span></div>`:""}</div>`;
   }
   g.innerHTML = html;
+
+  const summaryEl = document.getElementById("calSummary");
+  if(summaryEl) summaryEl.innerHTML = `
+    <div class="cal-summary-item"><span>Töitä tässä kuussa</span><strong>${monthCount}</strong></div>
+    <div class="cal-summary-item"><span>Kuukauden arvo</span><strong>€${monthAmount}</strong></div>`;
 }
 
 function openCalendarDay(dateStr){
@@ -1503,6 +1515,7 @@ function renderCustomers(){
     const name = (j.name || "Uusi asiakas").trim();
     const phone = (j.phone || "").trim();
     const key = name.toLowerCase() + "|" + phone;
+    const created = jobCreatedDateStr(j);
 
     if (!customerMap[key]) {
       customerMap[key] = {
@@ -1510,16 +1523,41 @@ function renderCustomers(){
         phone: phone,
         visits: 0,
         totalSpent: 0,
+        lastVisit: "",
         jobs: []
       };
     }
 
     customerMap[key].visits += 1;
     customerMap[key].totalSpent += Number(j.price) || 0;
+    if(created > customerMap[key].lastVisit) customerMap[key].lastVisit = created;
     customerMap[key].jobs.push(j);
   });
 
-  customerListCache = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
+  let list = Object.values(customerMap);
+
+  const totalCustomers = list.length;
+  const totalRevenue = list.reduce((a,c)=>a+c.totalSpent,0);
+  document.getElementById("custTotalCount").textContent = totalCustomers;
+  document.getElementById("custTotalRevenue").textContent = "€"+totalRevenue;
+  document.getElementById("custAvgSpend").textContent = "€"+(totalCustomers ? Math.round(totalRevenue/totalCustomers) : 0);
+
+  const search = (document.getElementById("customerSearch")?.value || "").trim().toLowerCase();
+  if(search){
+    list = list.filter(c => c.name.toLowerCase().includes(search) || c.phone.toLowerCase().includes(search));
+  }
+  const noteEl = document.getElementById("customersFilterNote");
+  if(noteEl) noteEl.textContent = search ? `${list.length} / ${totalCustomers} asiakasta haulla "${search}"` : "";
+
+  const sort = document.getElementById("customerSort")?.value || "spent";
+  list.sort((a,b) => {
+    if(sort==="visits") return b.visits - a.visits;
+    if(sort==="recent") return (b.lastVisit||"").localeCompare(a.lastVisit||"");
+    if(sort==="name") return a.name.localeCompare(b.name, "fi");
+    return b.totalSpent - a.totalSpent;
+  });
+
+  customerListCache = list;
 
   document.getElementById("customersGrid").innerHTML = customerListCache.map((c, idx) => {
     const initial = c.name ? c.name.charAt(0).toUpperCase() : "?";
@@ -1529,14 +1567,15 @@ function renderCustomers(){
           <div class="person-icon" style="display:flex;align-items:center;justify-content:center;font-weight:bold;background:var(--primary-light);color:var(--primary);">${initial}</div>
           <div>
             <h3>${c.name}</h3>
-            <p>${c.visits} käyntiä ${c.phone ? `· ${c.phone}` : ""}</p>
+            <p>${c.phone || "Ei puhelinnumeroa"}</p>
           </div>
         </div>
+        <p>${c.visits} käyntiä ${c.lastVisit ? `· viimeksi ${isoToFin(c.lastVisit)}` : ""}</p>
         <div class="money">${c.totalSpent} €</div>
         <p>Yhteensä</p>
       </div>
     `;
-  }).join("");
+  }).join("") || '<p style="color:var(--text-muted);font-size:13px;padding:20px 0;">Ei hakuehtoja vastaavia asiakkaita.</p>';
 }
 
 function openCustomerHistory(idx){
@@ -1843,17 +1882,38 @@ function localISO(d){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
+let reportsActivePeriod = "month";
 function setReportPeriod(kind){
   const fromEl=document.getElementById("exportFrom"), toEl=document.getElementById("exportTo");
-  if(kind==="month"){
-    const d=new Date();
+  const d=new Date();
+  if(kind==="today"){
+    const iso=localISO(d);
+    fromEl.value=iso;
+    toEl.value=iso;
+  } else if(kind==="week"){
+    const dow=(d.getDay()+6)%7; // Monday = 0
+    const monday=new Date(d); monday.setDate(d.getDate()-dow);
+    const sunday=new Date(monday); sunday.setDate(monday.getDate()+6);
+    fromEl.value=localISO(monday);
+    toEl.value=localISO(sunday);
+  } else if(kind==="month"){
     fromEl.value=localISO(new Date(d.getFullYear(), d.getMonth(), 1));
     toEl.value=localISO(new Date(d.getFullYear(), d.getMonth()+1, 0));
+  } else if(kind==="year"){
+    fromEl.value=localISO(new Date(d.getFullYear(), 0, 1));
+    toEl.value=localISO(new Date(d.getFullYear(), 11, 31));
   } else {
     fromEl.value="";
     toEl.value="";
   }
+  reportsActivePeriod = kind;
   renderReports();
+}
+
+function highlightReportPeriod(){
+  document.querySelectorAll(".export-btn[data-period]").forEach(btn=>{
+    btn.classList.toggle("primary", btn.dataset.period===reportsActivePeriod);
+  });
 }
 
 // Only auto-scope the reports view to the current month the first time it's
@@ -1880,6 +1940,7 @@ function renderReports(){
 
   const fromVal=document.getElementById("exportFrom").value, toVal=document.getElementById("exportTo").value;
   document.getElementById("rPeriodLabel").textContent = (fromVal||toVal) ? `${isoToFin(fromVal)||"…"} – ${isoToFin(toVal)||"…"}` : "Kaikki ajat";
+  highlightReportPeriod();
 
   // Still-open deliveries for the reference day — always "today" (or, after
   // closing time, "tomorrow" — see referenceDateStr()), regardless of the
@@ -1903,7 +1964,8 @@ function renderReports(){
 function csvRows(){let d=getExportData();return [["Työ ID","Lähde","Asiakas","Päivämäärä","Tuote","Korjaus","Tila","Hinta"],...d.map(j=>[j.id,SOURCE_META[j.source||"store"]?.label||j.source,j.name,jobCreatedDateStr(j),j.product,j.work,statusLabel[j.status]||j.status,j.price])]}
 function exportCSV(){let rows=csvRows(),csv="\uFEFF"+rows.map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="tehtaankatu_suutari_export.csv";a.click()}
 function exportExcel(){let rows=csvRows(),table="<table><tr>"+rows[0].map(x=>`<th>${x}</th>`).join("")+"</tr>"+rows.slice(1).map(r=>"<tr>"+r.map(x=>`<td>${x??""}</td>`).join("")+"</tr>").join("")+"</table>",a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff<html><meta charset='UTF-8'><body>"+table+"</body></html>"],{type:"application/vnd.ms-excel"}));a.download="tehtaankatu_suutari_export.xls";a.click()}
-["exportFrom","exportTo","exportSource","exportStatus"].forEach(id=>document.getElementById(id)?.addEventListener("change",renderReports));
+["exportFrom","exportTo"].forEach(id=>document.getElementById(id)?.addEventListener("change",()=>{reportsActivePeriod=null; renderReports();}));
+["exportSource","exportStatus"].forEach(id=>document.getElementById(id)?.addEventListener("change",renderReports));
 
 // Settings operations
 function saveSettings() {

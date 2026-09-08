@@ -238,6 +238,7 @@
     </div>
   </div>
   <div class="calendar card">
+    <div class="cal-summary" id="calSummary"></div>
     <div class="cal-head">
       <button onclick="changeCalendarMonth(-1)">‹</button>
       <h2 id="calTitle">Elokuu 2026</h2>
@@ -418,9 +419,12 @@
       </select>
     </label>
   </div>
-  <div style="display:flex; gap:8px; margin:12px 0 4px;">
-    <button class="export-btn" onclick="setReportPeriod('month')">📅 Tämä kuukausi</button>
-    <button class="export-btn" onclick="setReportPeriod('all')">Kaikki ajat</button>
+  <div style="display:flex; gap:8px; margin:12px 0 4px; flex-wrap:wrap;">
+    <button class="export-btn" data-period="today" onclick="setReportPeriod('today')">Tänään</button>
+    <button class="export-btn" data-period="week" onclick="setReportPeriod('week')">Tämä viikko</button>
+    <button class="export-btn" data-period="month" onclick="setReportPeriod('month')">📅 Tämä kuukausi</button>
+    <button class="export-btn" data-period="year" onclick="setReportPeriod('year')">Tämä vuosi</button>
+    <button class="export-btn" data-period="all" onclick="setReportPeriod('all')">Kaikki ajat</button>
   </div>
 
   <div class="stats-grid">
@@ -598,6 +602,25 @@
       <p>Asiakashistoria ja tiedot.</p>
     </div>
   </div>
+  <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);">
+    <div class="stat-card"><span>Asiakkaita</span><strong id="custTotalCount">0</strong></div>
+    <div class="stat-card"><span>Tuottoa yhteensä</span><strong id="custTotalRevenue">€0</strong></div>
+    <div class="stat-card"><span>Keskiostos / asiakas</span><strong id="custAvgSpend">€0</strong></div>
+  </div>
+  <div class="filter-grid card" style="grid-template-columns:2fr 1fr;">
+    <label>Hae asiakasta
+      <input type="text" id="customerSearch" placeholder="Nimi tai puhelinnumero…" oninput="renderCustomers()">
+    </label>
+    <label>Järjestä
+      <select id="customerSort" onchange="renderCustomers()">
+        <option value="spent">Eniten kulutettu</option>
+        <option value="visits">Eniten käyntejä</option>
+        <option value="recent">Viimeisin käynti</option>
+        <option value="name">Nimi (A–Ö)</option>
+      </select>
+    </label>
+  </div>
+  <p id="customersFilterNote" style="font-size:12px;color:var(--primary);font-weight:600;margin:0 0 8px;"></p>
   <div id="customersGrid" class="customer-grid"></div>
 </section>
 
