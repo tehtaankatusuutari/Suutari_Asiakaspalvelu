@@ -414,11 +414,11 @@ function showPage(id){
 }
 document.querySelectorAll("[data-page]").forEach(x=>x.onclick=()=>showPage(x.dataset.page));
 
-function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<small>${statusLabel[j.status]||j.status}</small></div></div>`}
+function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<span class="pill ${statusPillClass(j.status)}" onclick="event.stopPropagation();openStatus('${j.id}')" title="Päivitä tila">${statusLabel[j.status]||j.status}</span></div></div>`}
 
 function renderHome(){
   updateHeaderDate();
-  document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}">${(statusLabel[j.status]||j.status).toUpperCase()}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
+  document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}" onclick="event.stopPropagation();openStatus('${j.id}')" title="Päivitä tila">${(statusLabel[j.status]||j.status).toUpperCase()}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
   renderMorningBrief();
   renderTodos();
   renderIntakeChart();
@@ -1352,7 +1352,13 @@ function setStatus(id,s){
     dbUpdateJobStatus(id, s);
   }
   closeModal();
-  openJob(id);
+  // Only jump into the job detail page if that's where the change was made
+  // from (the "PÄIVITÄ TILA" button there) — a quick status change from the
+  // Työt/Tänään lists should update those lists in place, not pull the user
+  // into the job page.
+  if(document.querySelector(".page.active")?.id === "job"){
+    openJob(id);
+  }
   renderHome();
   renderJobs();
 

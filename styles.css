@@ -605,6 +605,29 @@ main {
   margin-top: 2px;
 }
 
+.job-price .pill {
+  display: block;
+  width: fit-content;
+  margin: 4px 0 0 auto;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.job-price .pill:hover {
+  filter: brightness(0.95);
+  transform: scale(1.04);
+}
+
+.priority-top .pill {
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.priority-top .pill:hover {
+  filter: brightness(0.95);
+  transform: scale(1.04);
+}
+
 /* Message Summary Card */
 .message-summary {
   display: flex;
