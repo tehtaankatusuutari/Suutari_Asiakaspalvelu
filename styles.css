@@ -503,14 +503,16 @@ main {
 
 /* Solid backgrounds + white text (not the softer tinted look) so a status
    reads at a glance across the Työt list, Tänään cards and the calendar —
-   red = myöhässä, purple = odottaa/tuote saapui, blue = valmis (odottaa
-   noutoa), green = luovutettu, teal = työn alla. */
+   red = myöhässä, purple = odottaa/tuote saapui, orange = valmis (odottaa
+   noutoa) — kept distinct from teal (työn alla) and blue on purpose so the
+   two "waiting on something" states can't be mistaken for each other,
+   green = luovutettu, teal = työn alla. */
 .pill.red {
   background: #dc2626;
   color: #fff;
 }
 .pill.orange {
-  background: #ce671f;
+  background: #ea580c;
   color: #fff;
 }
 .pill.teal {
@@ -523,10 +525,6 @@ main {
 }
 .pill.purple {
   background: #7c3aed;
-  color: #fff;
-}
-.pill.blue {
-  background: #2563eb;
   color: #fff;
 }
 
@@ -966,8 +964,8 @@ main {
   gap: 10px;
   margin-top: 18px;
   padding: 14px 16px;
-  background: #eff4fe;
-  border: 1px solid #c7d9fb;
+  background: #fdf1e9;
+  border: 1px solid #f3cba7;
   border-radius: var(--radius-md);
   font-size: 13px;
   color: var(--text-muted);
@@ -976,14 +974,14 @@ main {
 }
 
 .ready-banner:hover {
-  background: #e2ecfd;
-  border-color: #2563eb;
+  background: #fbe4d3;
+  border-color: #ea580c;
 }
 
 .ready-banner-link {
   margin-left: auto;
   font-weight: 700;
-  color: #2563eb;
+  color: #ea580c;
 }
 
 .bulk-toggle-btn {
@@ -1166,7 +1164,7 @@ main {
   height: 16px;
   padding: 0 4px;
   border-radius: 50%;
-  background: #2563eb;
+  background: #ea580c;
   color: #fff;
   font-size: 10px;
   font-weight: 800;

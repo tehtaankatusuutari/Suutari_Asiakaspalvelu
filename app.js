@@ -366,7 +366,7 @@ function statusPillClass(s){
   if(s==='late') return 'red';
   if(s==='waiting'||s==='arrived') return 'purple';
   if(s==='done') return 'green';
-  if(s==='ready') return 'blue';
+  if(s==='ready') return 'orange';
   return 'teal';
 }
 
@@ -1178,7 +1178,7 @@ function renderJobs(){
   const readyCount = a.filter(j => j.status === "ready").length;
 
   const readyBanner = readyCount ? `<div class="ready-banner" onclick="setJobFilter('ready', document.querySelector('#jobs .chips button:nth-child(4)'))">
-    <span class="pill blue">✅ Valmis</span> ${readyCount} työtä odottaa noutoa <span class="ready-banner-link">Näytä →</span>
+    <span class="pill orange">✅ Valmis</span> ${readyCount} työtä odottaa noutoa <span class="ready-banner-link">Näytä →</span>
   </div>` : "";
 
   document.getElementById("jobsTable").innerHTML = (groups.length ? groups.map(([title,list])=>
