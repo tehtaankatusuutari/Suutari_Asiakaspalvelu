@@ -364,9 +364,9 @@ async function initData(){
 const statusLabel={active:"Työn alla",waiting:"Odottaa",ready:"Noudettavissa",late:"Myöhässä",arrived:"Tuote saapui",done:"Luovutettu"};
 function statusPillClass(s){
   if(s==='late') return 'red';
-  if(s==='waiting'||s==='arrived') return 'orange';
+  if(s==='waiting'||s==='arrived') return 'purple';
   if(s==='done') return 'green';
-  if(s==='ready') return 'purple';
+  if(s==='ready') return 'blue';
   return 'teal';
 }
 
@@ -1165,16 +1165,25 @@ function renderJobs(){
     return;
   }
 
-  // "Kaikki" — grouped by stage, delivered jobs excluded from this default view
+  // "Kaikki" — grouped by stage. Delivered jobs are excluded from this
+  // default view entirely (see "done" filter above), and ready ones are
+  // counted but not listed row-by-row — they're already done and just
+  // sitting there waiting on the customer, so they'd only push the jobs
+  // that still need work further down the page. The "Valmis" chip is the
+  // selective way to actually see them.
   const groups = [
     ["⏳ Odottaa", a.filter(j => j.status === "waiting" || j.status === "arrived").sort(byDeliveryUrgency)],
-    ["🔧 Työn alla", a.filter(j => j.status === "active" || j.status === "late").sort(byDeliveryUrgency)],
-    ["✅ Valmis", a.filter(j => j.status === "ready").sort(byDeliveryUrgency)]
+    ["🔧 Työn alla", a.filter(j => j.status === "active" || j.status === "late").sort(byDeliveryUrgency)]
   ].filter(([,list]) => list.length);
+  const readyCount = a.filter(j => j.status === "ready").length;
 
-  document.getElementById("jobsTable").innerHTML = groups.length ? groups.map(([title,list])=>
+  const readyBanner = readyCount ? `<div class="ready-banner" onclick="setJobFilter('ready', document.querySelector('#jobs .chips button:nth-child(4)'))">
+    <span class="pill blue">✅ Valmis</span> ${readyCount} työtä odottaa noutoa <span class="ready-banner-link">Näytä →</span>
+  </div>` : "";
+
+  document.getElementById("jobsTable").innerHTML = (groups.length ? groups.map(([title,list])=>
     `<div style="margin:16px 0 8px;font-size:13px;font-weight:700;color:var(--primary);">${title} <span style="color:var(--text-muted);font-weight:600;">(${list.length})</span></div>${tableHead}${list.map(rowHtml).join("")}`
-  ).join("") : empty;
+  ).join("") : (readyCount ? "" : empty)) + readyBanner;
 }
 
 async function uploadDetailAfterImage(e, id) {
