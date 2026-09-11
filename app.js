@@ -213,7 +213,6 @@ function updateBadges(){
   set("statDueTodayLabel", afterClosing ? "Toimitus huomenna" : "Toimitus tänään");
   set("statDueTodaySpan", afterClosing ? "🌙 Kauppa on kiinni" : "2 tunnin sisällä");
   set("statInProgress", activeJobs);
-  set("statReady", readyJobs);
   set("statNewMsg", whatsappWaiting);
   const overdueJobs = overdueUnclaimedJobs();
   const overdueSum = overdueJobs.reduce((sum, j) => sum + (Number(j.price) || 0), 0);
@@ -367,6 +366,7 @@ function statusPillClass(s){
   if(s==='late') return 'red';
   if(s==='waiting'||s==='arrived') return 'orange';
   if(s==='done') return 'green';
+  if(s==='ready') return 'purple';
   return 'teal';
 }
 
@@ -563,7 +563,7 @@ function openIntake(prefill=null){
   <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()"></div>
   <div class="field"><label>Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
   <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"><small id="priceHint" style="display:none;color:var(--teal);font-weight:600;"></small></div>
-  <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" oninput="document.getElementById('dateHint').style.display='none';"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
+  <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" min="${localISO(new Date())}" oninput="document.getElementById('dateHint').style.display='none';"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
   <div class="field full"><label>Hylly / sijainti</label><input id="loc" value="A1-01" placeholder="A3-07"></div>
   <div class="field full">
     <label>Kuva</label>
@@ -618,6 +618,11 @@ async function saveJob(addAnother = false){
   // leaving the button looking like it did nothing.
   try {
     let d=document.getElementById("date").value;
+    const todayIso = localISO(new Date());
+    if(d && d < todayIso){
+      alert("Toimituspäivä ei voi olla menneisyydessä. Valitse tämä päivä tai myöhempi.");
+      return;
+    }
     const nextId = "#" + jobIdSeq;
     jobIdSeq++;
 
@@ -649,7 +654,7 @@ async function saveJob(addAnother = false){
       product:document.getElementById("prod").value||"Tuote",
       work:document.getElementById("work").value||"Korjaus",
       price:+document.getElementById("price").value||0,
-      date:d?d.split("-").reverse().join("."):"28.08.2026",
+      date:d?d.split("-").reverse().join("."):todayDateStr(),
       status,
       source,
       loc:document.getElementById("loc").value||"A1-01",
@@ -1480,9 +1485,10 @@ function jobStatsByDate(){
   const stats = {};
   jobs.forEach(j=>{
     if(!j.date) return;
-    if(!stats[j.date]) stats[j.date] = { count: 0, amount: 0 };
+    if(!stats[j.date]) stats[j.date] = { count: 0, amount: 0, readyCount: 0 };
     stats[j.date].count += 1;
     stats[j.date].amount += Number(j.price) || 0;
+    if(j.status === "ready") stats[j.date].readyCount += 1;
   });
   return stats;
 }
@@ -1504,11 +1510,13 @@ function renderCalendar(){
   for(let i=0;i<leadingBlanks;i++) html += '<div class="day empty"></div>';
   for(let d=1; d<=daysInMonth; d++){
     const dateStr = `${String(d).padStart(2,"0")}.${String(calendarViewMonth+1).padStart(2,"0")}.${calendarViewYear}`;
-    const s = stats[dateStr] || { count: 0, amount: 0 };
+    const s = stats[dateStr] || { count: 0, amount: 0, readyCount: 0 };
     monthCount += s.count;
     monthAmount += s.amount;
     const isToday = dateStr === todayStr;
-    html += `<div class="day ${isToday?"today":""} ${calendarDensityClass(s.count)}" onclick="openCalendarDay('${dateStr}')"><strong>${d}</strong>${s.count?`<div class="cal-info"><span class="cal-count">${s.count}</span><span class="cal-amount">€${s.amount}</span></div>`:""}</div>`;
+    const readyBadge = s.readyCount ? `<span class="cal-ready-badge" title="${s.readyCount} valmiina, odottaa noutoa">${s.readyCount}</span>` : "";
+    const info = s.count ? `<div class="cal-info"><span class="cal-count">${s.count}</span><span class="cal-amount">€${s.amount}</span></div>` : "";
+    html += `<div class="day ${isToday?"today":""} ${calendarDensityClass(s.count)}" onclick="openCalendarDay('${dateStr}')"><div class="day-top"><strong>${d}</strong>${readyBadge}</div>${info}</div>`;
   }
   g.innerHTML = html;
 
@@ -2605,46 +2613,17 @@ function renderMorningBrief() {
     return;
   }
 
+  // Kept deliberately short — two numbers, not a running list of every
+  // possible warning: how much is still unworked, and how much is finished
+  // and waiting on the customer. The delivery count naturally includes
+  // anything carried over from earlier days too, since rolloverOverdueDates()
+  // only ever moves a job's date forward — it never changes its status.
   const items = [];
-  const afterClosingBrief = isAfterClosing();
-  const refStr = referenceDateStr();
+  const pendingWork = jobs.filter(j => ["waiting","arrived","active","late"].includes(j.status)).length;
+  const pendingDelivery = jobs.filter(j => j.status === "ready").length;
 
-  // 1. Myöhässä olevat (Late jobs)
-  const lateJobsList = jobs.filter(j => j.status === "late");
-  if (lateJobsList.length > 0) {
-    items.push(`🔴 <strong>${lateJobsList.length} työtä on myöhässä!</strong> Suosittelemme saattamaan nämä nopeasti valmiiksi.`);
-  }
-
-  // 2. Tänään/huomenna toimitettavat (Due today, or tomorrow after closing time)
-  const dueTodayList = jobs.filter(j => j.date === refStr && j.status !== "done" && j.status !== "ready");
-  if (dueTodayList.length > 0) {
-    items.push(`📅 <strong>${dueTodayList.length} työ(tä) tulee luovuttaa ${afterClosingBrief ? "huomenna" : "tänään"}.</strong> Varmista, että nämä ovat valmiina.`);
-  }
-
-  // 3. Riskiryhmä: Malzeme bekleyen acil işler (Waiting for material due within 2 days)
-  const now = new Date();
-  const riskJobs = jobs.filter(j => {
-    if (j.status !== "waiting") return false;
-    try {
-      const parts = j.date.split(".");
-      if (parts.length === 3) {
-        const dueDate = new Date(parts[2], parts[1] - 1, parts[0]);
-        const diffTime = dueDate - now;
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        return diffDays >= 0 && diffDays <= 2;
-      }
-    } catch(e) {}
-    return false;
-  });
-  if (riskJobs.length > 0) {
-    items.push(`⚠️ <strong>${riskJobs.length} työ(tä) odottaa materiaaleja, vaikka toimitusaika on alle 48 tunnin päästä!</strong>`);
-  }
-
-  // 4. WhatsApp-lähteiset työt jotka odottavat tuotteen saapumista
-  const whatsappWaitingCount = jobs.filter(j => j.source === "whatsapp" && j.status === "waiting").length;
-  if (whatsappWaitingCount > 0) {
-    items.push(`💬 <strong>${whatsappWaitingCount} WhatsApp-tuotetta odottaa saapumista.</strong>`);
-  }
+  if (pendingWork > 0) items.push(`🔧 <strong>${pendingWork} työtä</strong> odottaa tekemistä.`);
+  if (pendingDelivery > 0) items.push(`📦 <strong>${pendingDelivery} tuotetta</strong> odottaa noutoa/luovutusta.`);
 
   if (items.length > 0) {
     briefList.innerHTML = items.map(item => `<li>${item}</li>`).join("");

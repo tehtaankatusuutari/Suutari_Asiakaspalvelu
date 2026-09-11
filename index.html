@@ -148,7 +148,6 @@
     <div class="stat red" onclick="goHomeStat('needs-action')"><small>Toimenpiteitä tarvitaan</small><strong id="statActionsNeeded">0</strong><span>Tänään</span></div>
     <div class="stat orange" onclick="goHomeStat('today')"><small id="statDueTodayLabel">Toimitus tänään</small><strong id="statDueToday">0</strong><span id="statDueTodaySpan">2 tunnin sisällä</span></div>
     <div class="stat blue" onclick="goHomeStat('active')"><small>Verstaalla</small><strong id="statInProgress">0</strong><span>Työn alla</span></div>
-    <div class="stat teal" onclick="goHomeStat('ready')"><small>Valmis</small><strong id="statReady">0</strong><span>Asiakasta odotetaan</span></div>
     <div class="stat purple" onclick="goHomeStat('whatsapp-waiting')"><small>WhatsApp odottaa</small><strong id="statNewMsg">0</strong><span>Tuote ei vielä saapunut</span></div>
     <div class="stat red" onclick="goHomeStat('overdue-unclaimed')"><small>Ei noudettu, siirretty</small><strong id="statOverdueCount">0</strong><span id="statOverdueSum">€0</span></div>
   </div>
@@ -239,6 +238,7 @@
   </div>
   <div class="calendar card">
     <div class="cal-summary" id="calSummary"></div>
+    <p class="cal-instructions">💡 Klikkaa päivää nähdäksesi ja avataksesi sen työt. Uuden työn toimituspäivä valitaan aina "Uusi vastaanotto" -lomakkeella — mennyttä päivää ei voi valita sinne.</p>
     <div class="cal-head">
       <button onclick="changeCalendarMonth(-1)">‹</button>
       <h2 id="calTitle">Elokuu 2026</h2>
@@ -253,6 +253,7 @@
       <span><i style="background:#d9a441"></i>3–4 työtä</span>
       <span><i style="background:#ce671f"></i>5–6 työtä (suositeltu maksimi)</span>
       <span><i style="background:#c93d3d"></i>7+ työtä</span>
+      <span><i style="background:#7c3aed;border-radius:50%;"></i>Valmiina, odottaa noutoa</span>
     </div>
   </div>
 </section>
