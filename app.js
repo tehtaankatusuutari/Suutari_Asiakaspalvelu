@@ -203,7 +203,12 @@ function updateBadges(){
   const readyJobs = jobs.filter(j=>j.status==="ready").length;
   const afterClosing = isAfterClosing();
   const refDate = referenceDateStr();
-  const dueRefJobs = jobs.filter(j=>j.date===refDate);
+  // Already-delivered jobs are done, not an open "toimitus tänään" —
+  // dropped entirely rather than just hidden, so the count and the list
+  // agree. What's left is ordered so the ones that still need work show
+  // before the ones just sitting there ready for pickup.
+  const dueRefJobs = jobs.filter(j=>j.date===refDate && j.status!=="done")
+    .sort((a,b)=> (a.status==="ready"?1:0) - (b.status==="ready"?1:0));
   const whatsappWaiting = jobs.filter(j=>j.source==="whatsapp" && j.status==="waiting").length;
 
   const set=(id,val)=>{const el=document.getElementById(id);if(el)el.textContent=val;};
@@ -2000,11 +2005,15 @@ function renderReports(){
   document.getElementById("rDueTodayCount").textContent = dueRefReportJobs.length;
   document.getElementById("rDueTodayRevenue").textContent = "€"+dueRefReportJobs.reduce((a,j)=>a+(Number(j.price)||0),0);
 
-  let src=document.getElementById("sourceStats"),sourceKeys=["store","whatsapp"],mx=Math.max(1,...sourceKeys.map(s=>jobs.filter(j=>(j.source||"store")===s).length));
-  src.innerHTML=sourceKeys.map(s=>{let n=jobs.filter(j=>(j.source||"store")===s).length,m=SOURCE_META[s];return `<div class="source-row"><span>${m.icon} ${m.label}</span><div class="bar"><i style="width:${n/mx*100}%"></i></div><b>${n}</b></div>`}).join("");
+  // Both breakdowns below read from `d` (the date/kanava/tila-filtered set),
+  // not the raw `jobs` array — otherwise they'd stay frozen at all-time
+  // totals no matter what filters were picked above, which is what made the
+  // whole page look unresponsive to the date pickers.
+  let src=document.getElementById("sourceStats"),sourceKeys=["store","whatsapp"],mx=Math.max(1,...sourceKeys.map(s=>d.filter(j=>(j.source||"store")===s).length));
+  src.innerHTML=sourceKeys.map(s=>{let n=d.filter(j=>(j.source||"store")===s).length,m=SOURCE_META[s];return `<div class="source-row"><span>${m.icon} ${m.label}</span><div class="bar"><i style="width:${n/mx*100}%"></i></div><b>${n}</b></div>`}).join("");
 
-  let sts=[["waiting","Odottaa"],["arrived","Tuote saapui"],["active","Työn alla"],["late","Myöhässä"],["ready","Valmis"],["done","Luovutettu"]],sm=Math.max(1,...sts.map(x=>jobs.filter(j=>j.status===x[0]).length));
-  document.getElementById("statusStats").innerHTML=sts.map(x=>{let n=jobs.filter(j=>j.status===x[0]).length;return `<div class="status-row"><span>${x[1]}</span><div class="bar"><i style="width:${n/sm*100}%"></i></div><b>${n}</b></div>`}).join("");
+  let sts=[["waiting","Odottaa"],["arrived","Tuote saapui"],["active","Työn alla"],["late","Myöhässä"],["ready","Valmis"],["done","Luovutettu"]],sm=Math.max(1,...sts.map(x=>d.filter(j=>j.status===x[0]).length));
+  document.getElementById("statusStats").innerHTML=sts.map(x=>{let n=d.filter(j=>j.status===x[0]).length;return `<div class="status-row"><span>${x[1]}</span><div class="bar"><i style="width:${n/sm*100}%"></i></div><b>${n}</b></div>`}).join("");
 
   document.getElementById("exportTable").innerHTML=d.map(j=>`<tr><td>${j.id}</td><td><span class="source-pill">${SOURCE_META[j.source||"store"]?.icon||""} ${SOURCE_META[j.source||"store"]?.label||j.source}</span></td><td>${j.name||""}</td><td>${jobCreatedDateStr(j)}</td><td>${j.product||""}</td><td>${j.work||""}</td><td><span class="status-pill">${statusLabel[j.status]||j.status||""}</span></td><td>${j.price!==""&&j.price!=null?"€"+j.price:""}</td></tr>`).join("")||'<tr><td colspan="8" class="empty-row">Ei hakuehtoja vastaavia tietoja.</td></tr>';
   document.getElementById("previewCount").textContent=d.length+" työtä";
@@ -2622,17 +2631,26 @@ function renderMorningBrief() {
     return;
   }
 
-  // Kept deliberately short — two numbers, not a running list of every
-  // possible warning: how much is still unworked, and how much is finished
-  // and waiting on the customer. The delivery count naturally includes
-  // anything carried over from earlier days too, since rolloverOverdueDates()
-  // only ever moves a job's date forward — it never changes its status.
+  // Kept deliberately short — a handful of numbers, not a running list of
+  // every possible warning: how much is still unworked, how much is
+  // finished and waiting on the customer (both with their € value), and
+  // what today's expected till take looks like. The delivery count
+  // naturally includes anything carried over from earlier days too, since
+  // rolloverOverdueDates() only ever moves a job's date forward — it never
+  // changes its status.
   const items = [];
-  const pendingWork = jobs.filter(j => ["waiting","arrived","active","late"].includes(j.status)).length;
-  const pendingDelivery = jobs.filter(j => j.status === "ready").length;
+  const pendingWorkJobs = jobs.filter(j => ["waiting","arrived","active","late"].includes(j.status));
+  const pendingDeliveryJobs = jobs.filter(j => j.status === "ready");
+  const pendingWorkSum = pendingWorkJobs.reduce((a,j)=>a+(Number(j.price)||0),0);
+  const pendingDeliverySum = pendingDeliveryJobs.reduce((a,j)=>a+(Number(j.price)||0),0);
 
-  if (pendingWork > 0) items.push(`🔧 <strong>${pendingWork} työtä</strong> odottaa tekemistä.`);
-  if (pendingDelivery > 0) items.push(`📦 <strong>${pendingDelivery} tuotetta</strong> odottaa noutoa/luovutusta.`);
+  if (pendingWorkJobs.length > 0) items.push(`🔧 <strong>${pendingWorkJobs.length} työtä</strong> (€${pendingWorkSum}) odottaa tekemistä.`);
+  if (pendingDeliveryJobs.length > 0) items.push(`📦 <strong>${pendingDeliveryJobs.length} tuotetta</strong> (€${pendingDeliverySum}) odottaa noutoa/luovutusta.`);
+
+  const afterClosingBrief = isAfterClosing();
+  const dueTodayJobs = jobs.filter(j => j.date === referenceDateStr() && j.status !== "done");
+  const dueTodaySum = dueTodayJobs.reduce((a,j)=>a+(Number(j.price)||0),0);
+  if (dueTodayJobs.length > 0) items.push(`💶 ${afterClosingBrief ? "Huomenna" : "Tänään"} odotettu tahsilat: <strong>€${dueTodaySum}</strong> (${dueTodayJobs.length} työtä).`);
 
   if (items.length > 0) {
     briefList.innerHTML = items.map(item => `<li>${item}</li>`).join("");
