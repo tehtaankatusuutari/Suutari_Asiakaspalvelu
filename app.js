@@ -650,6 +650,14 @@ async function saveJob(addAnother = false){
       alert("Toimituspäivä ei voi olla menneisyydessä. Valitse tämä päivä tai myöhempi.");
       return;
     }
+    if(d){
+      const [dy, dm, dday] = d.split("-").map(Number);
+      const weekday = new Date(dy, dm-1, dday).getDay();
+      if(weekday === 0 || weekday === 6){
+        alert("Toimituspäivä ei voi olla viikonloppu — liike on kiinni. Valitse arkipäivä.");
+        return;
+      }
+    }
     const nextId = "#" + jobIdSeq;
     jobIdSeq++;
 
@@ -871,9 +879,15 @@ function suggestDeliveryDate(){
   const d = new Date();
   d.setDate(d.getDate() + 2);
   for(let i=0; i<60; i++){
-    const dateStr = `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
-    const count = stats[dateStr]?.count || 0;
-    if(count <= 4) return { iso: localISO(d), fin: dateStr, count };
+    const weekday = d.getDay();
+    // Shop is closed Sat/Sun (see nextBusinessDay) — those days always
+    // look "free" in the stats, so without this check the suggestion
+    // kept defaulting new jobs onto a day nobody's there to hand them out.
+    if(weekday !== 0 && weekday !== 6){
+      const dateStr = `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+      const count = stats[dateStr]?.count || 0;
+      if(count <= 4) return { iso: localISO(d), fin: dateStr, count };
+    }
     d.setDate(d.getDate()+1);
   }
   return null;
@@ -1361,7 +1375,15 @@ function saveEditJob(id){
   j.work = document.getElementById("editWork").value.trim() || j.work;
   j.price = +document.getElementById("editPrice").value || 0;
   const d = document.getElementById("editDate").value;
-  if(d) j.date = d.split("-").reverse().join(".");
+  if(d){
+    const [dy, dm, dday] = d.split("-").map(Number);
+    const weekday = new Date(dy, dm-1, dday).getDay();
+    if(weekday === 0 || weekday === 6){
+      alert("Toimituspäivä ei voi olla viikonloppu — liike on kiinni. Valitse arkipäivä.");
+      return;
+    }
+    j.date = d.split("-").reverse().join(".");
+  }
   j.loc = document.getElementById("editLoc").value.trim() || j.loc;
   j.note = document.getElementById("editNote").value;
   j.customer_note = document.getElementById("editCustomerNote").value;
