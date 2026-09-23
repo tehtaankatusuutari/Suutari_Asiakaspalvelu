@@ -1201,6 +1201,12 @@ main {
 .day.cal-high { background: #fff0e4; }
 .day.cal-over { background: #fde8e8; }
 
+/* Past days: numbers are jobs actually picked up that day, not a workload
+   forecast — always green regardless of how many, unlike the density colors
+   above which warn about upcoming over-capacity days. */
+.day.cal-past-done { background: #eafaf0; }
+.day.cal-past-done .cal-count { background: #18a66b; }
+
 .cal-info {
   display: flex;
   align-items: center;

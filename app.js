@@ -162,22 +162,26 @@ function nextBusinessDay(from){
   return next;
 }
 
-// Every day after closing time, any job that's still unclaimed (not
-// "done") and whose delivery date has arrived or already passed gets
-// pushed to the next business day, so "Toimitus tänään" always reflects
-// a realistic expected pickup day instead of accumulating stale dates.
+// Any job that's still unclaimed (not "done") and whose delivery date has
+// already passed (a previous day) gets pushed to the next business day
+// right away — a full day's closing time is definitely behind it, no
+// matter what time it is now. A job due *today* waits until today's own
+// closing time before rolling, so "Toimitus tänään" always reflects a
+// realistic expected pickup day instead of accumulating stale dates.
 // Self-limiting: once a job's date is rolled forward it's no longer due
 // today, so this won't touch it again until it becomes due once more.
 function rolloverOverdueDates(){
-  if(!isAfterClosing()) return;
-  const todayStart = new Date();
+  const now = new Date();
+  const todayStart = new Date(now);
   todayStart.setHours(0,0,0,0);
+  const afterClosing = isAfterClosing();
   const rolled = [];
   jobs.forEach(j => {
     if(j.status === "done") return;
     const d = parseFinDate(j.date);
     if(!d || d > todayStart) return;
-    j.date = toFinDateStr(nextBusinessDay(new Date()));
+    if(d.getTime() === todayStart.getTime() && !afterClosing) return;
+    j.date = toFinDateStr(nextBusinessDay(now));
     j.postponed_count = (j.postponed_count || 0) + 1;
     rolled.push(j);
   });
@@ -1519,6 +1523,7 @@ function renderCalendar(){
   const stats = jobStatsByDate();
   const now = new Date();
   const todayStr = `${String(now.getDate()).padStart(2,"0")}.${String(now.getMonth()+1).padStart(2,"0")}.${now.getFullYear()}`;
+  const todayMidnight = new Date(now); todayMidnight.setHours(0,0,0,0);
 
   let html = "", monthCount = 0, monthAmount = 0;
   for(let i=0;i<leadingBlanks;i++) html += '<div class="day empty"></div>';
@@ -1528,9 +1533,15 @@ function renderCalendar(){
     monthCount += s.count;
     monthAmount += s.amount;
     const isToday = dateStr === todayStr;
+    // Past days only ever keep jobs that were actually picked up ("done") —
+    // rolloverOverdueDates() moves anything unclaimed to the next business
+    // day — so a past day's numbers are collected revenue, not a workload
+    // forecast. Show them in green instead of the busy/over-capacity colors.
+    const isPast = new Date(calendarViewYear, calendarViewMonth, d) < todayMidnight;
+    const densityClass = isPast ? (s.count ? "cal-past-done" : "") : calendarDensityClass(s.count);
     const readyBadge = s.readyCount ? `<span class="cal-ready-badge" title="${s.readyCount} valmiina, odottaa noutoa">${s.readyCount}</span>` : "";
     const info = s.count ? `<div class="cal-info"><span class="cal-count">${s.count}</span><span class="cal-amount">€${s.amount}</span></div>` : "";
-    html += `<div class="day ${isToday?"today":""} ${calendarDensityClass(s.count)}" onclick="openCalendarDay('${dateStr}')"><div class="day-top"><strong>${d}</strong>${readyBadge}</div>${info}</div>`;
+    html += `<div class="day ${isToday?"today":""} ${densityClass}" onclick="openCalendarDay('${dateStr}')"><div class="day-top"><strong>${d}</strong>${readyBadge}</div>${info}</div>`;
   }
   g.innerHTML = html;
 
