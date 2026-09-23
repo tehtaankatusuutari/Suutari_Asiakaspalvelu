@@ -321,10 +321,28 @@ async function dbUpdateJob(id, fields) {
 async function syncFromDb() {
   if(!supabaseClient) return false;
   try {
-    const { data: jobData, error: jobErr } = await supabaseClient.from("jobs").select("*").order("created_at", { ascending: false });
-    if(jobErr) throw jobErr;
+    // PostgREST caps a single select at ~1000 rows by default, silently —
+    // it doesn't error, it just stops. Once the shop passes 1000 jobs, an
+    // unpaginated query starts dropping the oldest rows (order is newest
+    // first), making old calendar days look empty even though the data is
+    // still in the database. Page through with .range() until a page comes
+    // back short of a full page.
+    const pageSize = 1000;
+    let allJobs = [];
+    let from = 0;
+    while(true){
+      const { data: page, error: jobErr } = await supabaseClient
+        .from("jobs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(from, from + pageSize - 1);
+      if(jobErr) throw jobErr;
+      allJobs = allJobs.concat(page || []);
+      if(!page || page.length < pageSize) break;
+      from += pageSize;
+    }
 
-    jobs = jobData || [];
+    jobs = allJobs;
     saveState();
     return true;
   } catch(err) {
@@ -1499,14 +1517,29 @@ function calendarDensityClass(count){
   return "cal-over";
 }
 
+// A "done" job's own `date` field can be stale — it's whatever pickup day
+// was expected at some point (possibly rolled forward while it sat
+// unclaimed, or a future day if the customer collected it early) — while
+// `delivered_at` is stamped once, exactly when it was actually handed
+// over. The calendar should reflect reality, so completed jobs are
+// grouped by their real delivery day, not their last-known expected one.
+function calendarDateKey(j){
+  if(j.status === "done" && j.delivered_at){
+    const d = new Date(j.delivered_at);
+    return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+  }
+  return j.date;
+}
+
 function jobStatsByDate(){
   const stats = {};
   jobs.forEach(j=>{
-    if(!j.date) return;
-    if(!stats[j.date]) stats[j.date] = { count: 0, amount: 0, readyCount: 0 };
-    stats[j.date].count += 1;
-    stats[j.date].amount += Number(j.price) || 0;
-    if(j.status === "ready") stats[j.date].readyCount += 1;
+    const dateKey = calendarDateKey(j);
+    if(!dateKey) return;
+    if(!stats[dateKey]) stats[dateKey] = { count: 0, amount: 0, readyCount: 0 };
+    stats[dateKey].count += 1;
+    stats[dateKey].amount += Number(j.price) || 0;
+    if(j.status === "ready") stats[dateKey].readyCount += 1;
   });
   return stats;
 }
@@ -1552,7 +1585,7 @@ function renderCalendar(){
 }
 
 function openCalendarDay(dateStr){
-  const dayJobs = jobs.filter(j=>j.date===dateStr);
+  const dayJobs = jobs.filter(j=>calendarDateKey(j)===dateStr);
   const count = dayJobs.length;
   const capacityNote = count>6
     ? `⚠️ ${count} työtä — yli suositellun 6 työn rajan.`
