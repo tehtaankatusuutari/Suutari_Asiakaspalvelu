@@ -2459,6 +2459,11 @@ main {
   grid-template-columns: repeat(3, 1fr);
 }
 
+.stats-grid-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+
 .month-nav {
   display: flex;
   align-items: center;

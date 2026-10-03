@@ -1715,11 +1715,23 @@ function renderCustomers(){
   document.getElementById("custAvgSpend").textContent = "€"+(totalCustomers ? Math.round(totalRevenue/totalCustomers) : 0);
 
   const search = (document.getElementById("customerSearch")?.value || "").trim().toLowerCase();
-  if(search){
-    list = list.filter(c => c.name.toLowerCase().includes(search) || c.phone.toLowerCase().includes(search));
-  }
   const noteEl = document.getElementById("customersFilterNote");
-  if(noteEl) noteEl.textContent = search ? `${list.length} / ${totalCustomers} asiakasta haulla "${search}"` : "";
+
+  if(!search){
+    if(noteEl) noteEl.textContent = "";
+    customerListCache = [];
+    document.getElementById("customersGrid").innerHTML = `
+      <div style="grid-column:1/-1; text-align:center; padding:45px 20px; background:#fff; border:1px dashed var(--border-color); border-radius:var(--radius-md);">
+        <div style="font-size:36px; margin-bottom:10px;">🔍</div>
+        <h3 style="margin:0 0 6px; font-size:16px; color:var(--primary); font-family:var(--font-heading);">Etsi asiakasta nimellä tai puhelinnumerolla</h3>
+        <p style="margin:0; font-size:13px; color:var(--text-muted);">Näet asiakkaan tiedot ja tilaushistorian kirjoittamalla nimen tai puhelinnumeron yllä olevaan kenttään.</p>
+      </div>
+    `;
+    return;
+  }
+
+  list = list.filter(c => c.name.toLowerCase().includes(search) || c.phone.toLowerCase().includes(search));
+  if(noteEl) noteEl.textContent = `${list.length} / ${totalCustomers} asiakasta haulla "${search}"`;
 
   const sort = document.getElementById("customerSort")?.value || "spent";
   list.sort((a,b) => {
@@ -1747,7 +1759,7 @@ function renderCustomers(){
         <p>Yhteensä</p>
       </div>
     `;
-  }).join("") || '<p style="color:var(--text-muted);font-size:13px;padding:20px 0;">Ei hakuehtoja vastaavia asiakkaita.</p>';
+  }).join("") || '<p style="color:var(--text-muted);font-size:13px;padding:20px 0;grid-column:1/-1;text-align:center;">Ei hakuehtoja vastaavia asiakkaita.</p>';
 }
 
 function openCustomerHistory(idx){
@@ -2144,6 +2156,30 @@ function renderReports(){
   document.getElementById("rReceivedCount").textContent = received.length;
   document.getElementById("rDeliveredCount").textContent = delivered.length;
   document.getElementById("rRevenue").textContent = "€"+revenue;
+
+  const monthJobs = [...received, ...delivered];
+  const uniqueCustomerKeys = new Set();
+  monthJobs.forEach(j => {
+    const name = (j.name || "").trim().toLowerCase();
+    const phone = (j.phone || "").trim();
+    if(name || phone) uniqueCustomerKeys.add(name + "|" + phone);
+  });
+
+  const deliveredCustomerKeys = new Set();
+  delivered.forEach(j => {
+    const name = (j.name || "").trim().toLowerCase();
+    const phone = (j.phone || "").trim();
+    if(name || phone) deliveredCustomerKeys.add(name + "|" + phone);
+  });
+
+  const monthCustCount = uniqueCustomerKeys.size;
+  const deliveredCustCount = deliveredCustomerKeys.size;
+  const avgSpend = deliveredCustCount ? Math.round(revenue / deliveredCustCount) : 0;
+
+  const elMonthCust = document.getElementById("rMonthCustomers");
+  const elMonthAvg = document.getElementById("rMonthAvgSpend");
+  if(elMonthCust) elMonthCust.textContent = monthCustCount;
+  if(elMonthAvg) elMonthAvg.textContent = "€" + avgSpend;
 
   const catCounts = {};
   JOB_CATEGORIES.forEach(c => catCounts[c.key] = 0);
