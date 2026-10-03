@@ -452,11 +452,19 @@ function showPage(id){
 }
 document.querySelectorAll("[data-page]").forEach(x=>x.onclick=()=>showPage(x.dataset.page));
 
-function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.source==="whatsapp"?"💬 ":j.source==="order"?"📝 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<span class="pill ${statusPillClass(j.status)}" onclick="event.stopPropagation();openStatus('${j.id}')" title="Päivitä tila">${statusLabel[j.status]||j.status}</span></div></div>`}
+function quickStatusBtn(j){
+  if(j.status === "done") return "";
+  if(j.status === "ready"){
+    return `<button class="quick-status-btn done-btn" onclick="quickSetStatus(event, '${j.id}', 'done')" title="Merkitse luovutetuksi (✔ Teslim)">✔ Luovuta</button>`;
+  }
+  return `<button class="quick-status-btn ready-btn" onclick="quickSetStatus(event, '${j.id}', 'ready')" title="Merkitse valmiiksi (✅ Hazır)">✅ Valmis</button>`;
+}
+
+function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img||bag}"><div><b>${j.source==="whatsapp"?"💬 ":j.source==="order"?"📝 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price" onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:6px;justify-content:flex-end;"><b>${j.price} €</b><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Muut tilat">${statusLabel[j.status]||j.status}</span>${quickStatusBtn(j)}</div></div>`}
 
 function renderHome(){
   updateHeaderDate();
-  document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}" onclick="event.stopPropagation();openStatus('${j.id}')" title="Päivitä tila">${(statusLabel[j.status]||j.status).toUpperCase()}</span><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
+  document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}" onclick="event.stopPropagation();openStatus('${j.id}')" title="Muut tilat">${(statusLabel[j.status]||j.status).toUpperCase()}</span><div onclick="event.stopPropagation()">${quickStatusBtn(j)}</div><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
   renderMorningBrief();
   renderTodos();
   renderIntakeChart();
@@ -1176,7 +1184,7 @@ function renderJobs(){
 
   const checkboxCell = j => bulkMode ? `<div onclick="event.stopPropagation()"><input type="checkbox" class="job-row-check" ${selectedJobIds.has(j.id)?"checked":""} onchange="toggleJobSelect('${j.id}', this.checked)"></div>` : "";
   const tableHead = `<div class="table-head">${bulkMode?"<div></div>":""}<div></div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`;
-  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')">${checkboxCell(j)}<div style="position:relative;"><img class="row-thumb" src="${j.img||bag}" title="${j.id}">${j.source==="whatsapp"?'<span class="row-thumb-badge">💬</span>':j.source==="order"?'<span class="row-thumb-badge">📝</span>':""}</div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div onclick="event.stopPropagation()"><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Päivitä tila">${statusLabel[j.status]||j.status}</span></div></div>`;
+  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')">${checkboxCell(j)}<div style="position:relative;"><img class="row-thumb" src="${j.img||bag}" title="${j.id}">${j.source==="whatsapp"?'<span class="row-thumb-badge">💬</span>':j.source==="order"?'<span class="row-thumb-badge">📝</span>':""}</div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;"><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Muut tilat">${statusLabel[j.status]||j.status}</span>${quickStatusBtn(j)}</div></div>`;
   const empty = `<p style="text-align:center;color:var(--text-muted);padding:30px 0;">Ei töitä.</p>`;
   document.getElementById("jobsTable").classList.toggle("bulk-mode", bulkMode);
   // Delivery dates in the past or today surface first — those are the ones
@@ -1508,6 +1516,49 @@ function setStatus(id,s){
       openNotificationModal(id, s);
     }, 300);
   }
+}
+
+function quickSetStatus(e, id, newStatus){
+  if(e) e.stopPropagation();
+  const j = jobs.find(x => x.id === id);
+  if(!j) return;
+
+  j.status = newStatus;
+  if(newStatus === "done" && !j.delivered_at){
+    j.delivered_at = new Date().toISOString();
+    saveState();
+    dbUpdateJob(id, { status: newStatus, delivered_at: j.delivered_at });
+  } else {
+    saveState();
+    dbUpdateJobStatus(id, newStatus);
+  }
+
+  showToast(newStatus === "done" ? `✔ Työ ${j.id} merkitty luovutetuksi!` : `✅ Työ ${j.id} merkitty valmiiksi!`);
+
+  renderHome();
+  renderJobs();
+
+  if (newStatus === "ready" || newStatus === "waiting") {
+    setTimeout(() => {
+      openNotificationModal(id, newStatus);
+    }, 300);
+  }
+}
+
+function showToast(msg){
+  let t = document.getElementById("appToast");
+  if(!t){
+    t = document.createElement("div");
+    t.id = "appToast";
+    t.className = "toast-msg";
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.style.display = "flex";
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => {
+    t.style.display = "none";
+  }, 2500);
 }
 
 function openNotificationModal(jobId, status) {
