@@ -460,7 +460,7 @@ function quickStatusBtn(j){
   return `<button class="quick-status-btn ready-btn" onclick="quickSetStatus(event, '${j.id}', 'ready')" title="Merkitse valmiiksi (✅ Hazır)">✅ Valmis</button>`;
 }
 
-function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img||bag}"><div><b>${j.source==="whatsapp"?"💬 ":j.source==="order"?"📝 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price" onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:6px;justify-content:flex-end;"><b>${j.price} €</b><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Muut tilat">${statusLabel[j.status]||j.status}</span>${quickStatusBtn(j)}</div></div>`}
+function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img||bag}"><div><b>${j.source==="whatsapp"?"💬 ":j.source==="order"?"📝 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price" onclick="event.stopPropagation()"><b>${j.price} €</b><div class="row-status"><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Muut tilat">${statusLabel[j.status]||j.status}</span>${quickStatusBtn(j)}</div></div></div>`}
 
 function renderHome(){
   updateHeaderDate();
@@ -1184,7 +1184,7 @@ function renderJobs(){
 
   const checkboxCell = j => bulkMode ? `<div onclick="event.stopPropagation()"><input type="checkbox" class="job-row-check" ${selectedJobIds.has(j.id)?"checked":""} onchange="toggleJobSelect('${j.id}', this.checked)"></div>` : "";
   const tableHead = `<div class="table-head">${bulkMode?"<div></div>":""}<div></div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`;
-  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')">${checkboxCell(j)}<div style="position:relative;"><img class="row-thumb" src="${j.img||bag}" title="${j.id}">${j.source==="whatsapp"?'<span class="row-thumb-badge">💬</span>':j.source==="order"?'<span class="row-thumb-badge">📝</span>':""}</div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div onclick="event.stopPropagation()" style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;"><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Muut tilat">${statusLabel[j.status]||j.status}</span>${quickStatusBtn(j)}</div></div>`;
+  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')">${checkboxCell(j)}<div style="position:relative;"><img class="row-thumb" src="${j.img||bag}" title="${j.id}">${j.source==="whatsapp"?'<span class="row-thumb-badge">💬</span>':j.source==="order"?'<span class="row-thumb-badge">📝</span>':""}</div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div onclick="event.stopPropagation()" class="row-status"><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Muut tilat">${statusLabel[j.status]||j.status}</span>${quickStatusBtn(j)}</div></div>`;
   const empty = `<p style="text-align:center;color:var(--text-muted);padding:30px 0;">Ei töitä.</p>`;
   document.getElementById("jobsTable").classList.toggle("bulk-mode", bulkMode);
   // Delivery dates in the past or today surface first — those are the ones

@@ -897,6 +897,13 @@ main {
   padding: 16px 20px;
 }
 
+.row-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
 /* Quick Status Action Buttons (3D Tactile Design) */
 .quick-status-btn {
   border: 0;
@@ -2889,12 +2896,12 @@ main {
     font-size: 12px;
     text-align: right;
   }
-  .table-row > div:last-child {
+  .table-row > div:last-child, .row-status {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
     justify-content: center;
-    gap: 4px;
+    gap: 3px;
     flex-shrink: 0;
   }
   .job-line {
