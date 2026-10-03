@@ -2455,6 +2455,54 @@ main {
   margin: 20px 0;
 }
 
+.stats-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.month-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.month-nav input[type="month"] {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  font: 700 13px var(--font-heading);
+  color: var(--primary);
+  background: #fff;
+}
+
+.daily-rev-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 24px;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  font-size: 12px;
+  color: var(--primary);
+  border-radius: var(--radius-sm);
+}
+
+.daily-rev-row:nth-child(odd) {
+  background: #f8fbfc;
+}
+
+.daily-rev-row b {
+  font-weight: 800;
+}
+
+.daily-rev-row.record {
+  background: #eafaf0;
+  color: #0f7a4e;
+}
+
+.daily-rev-row.record b {
+  color: #0f7a4e;
+}
+
 .stat-card {
   background: #fff;
   border: 1px solid var(--border-color);

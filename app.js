@@ -307,6 +307,17 @@ async function dbUpdateJobAfterImage(id, img_after) {
   }
 }
 
+async function dbUpdateJobImage(id, img) {
+  if (supabaseClient) {
+    try {
+      const { error } = await supabaseClient.from("jobs").update({ img }).eq("id", id);
+      if(error) notifyDbError("kuvan tallennus", error);
+    } catch(err) {
+      notifyDbError("kuvan tallennus", err);
+    }
+  }
+}
+
 async function dbUpdateJob(id, fields) {
   if (supabaseClient) {
     try {
@@ -441,7 +452,7 @@ function showPage(id){
 }
 document.querySelectorAll("[data-page]").forEach(x=>x.onclick=()=>showPage(x.dataset.page));
 
-function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.source==="whatsapp"?"💬 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<span class="pill ${statusPillClass(j.status)}" onclick="event.stopPropagation();openStatus('${j.id}')" title="Päivitä tila">${statusLabel[j.status]||j.status}</span></div></div>`}
+function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><img class="thumb" src="${j.img}"><div><b>${j.source==="whatsapp"?"💬 ":j.source==="order"?"📝 ":""}${j.id} · ${j.name}</b><small>${j.product} · ${j.work}</small></div><div class="job-price">${j.price} €<span class="pill ${statusPillClass(j.status)}" onclick="event.stopPropagation();openStatus('${j.id}')" title="Päivitä tila">${statusLabel[j.status]||j.status}</span></div></div>`}
 
 function renderHome(){
   updateHeaderDate();
@@ -536,10 +547,26 @@ function nextReceiptNumber(){
 // but only while that value is still the machine-suggested one (tracked via
 // data-auto — cleared the moment staff types, see the field's oninput) —
 // so switching source never clobbers a name/number someone already typed.
-function toggleWhatsappTracking(){
+function toggleSourceFields(){
   const source = document.getElementById("source")?.value;
   const field = document.getElementById("whatsappTrackingField");
   if(field) field.style.display = source === "whatsapp" ? "block" : "none";
+
+  // Special orders don't fit the "Korjaus" (repair) framing, so the same
+  // field is relabeled into a free-text order description instead of
+  // adding a whole separate form just for this one field.
+  const workLabel = document.getElementById("workLabel");
+  const workInput = document.getElementById("work");
+  if(workLabel && workInput){
+    if(source === "order"){
+      workLabel.textContent = "Tilauksen kuvaus";
+      workInput.placeholder = "Esim. Erikoistilaus: ruskea nahkalaukku, mitat 30x20cm";
+    } else {
+      workLabel.textContent = "Korjaus";
+      workInput.placeholder = "Vetoketjun vaihto";
+    }
+  }
+
   const nameEl = document.getElementById("n");
   if(!nameEl) return;
   const isAutoFilled = !nameEl.value.trim() || nameEl.dataset.auto === "1";
@@ -568,9 +595,10 @@ function openIntake(prefill=null){
 <div class="form">
   <div class="field full">
     <label>Lähde</label>
-    <select id="source" onchange="toggleWhatsappTracking()">
-      <option value="store" ${prefill?.source!=="whatsapp"?"selected":""}>🏪 Myymälä</option>
+    <select id="source" onchange="toggleSourceFields()">
+      <option value="store" ${prefill?.source!=="whatsapp"&&prefill?.source!=="order"?"selected":""}>🏪 Myymälä</option>
       <option value="whatsapp" ${prefill?.source==="whatsapp"?"selected":""}>💬 WhatsApp</option>
+      <option value="order" ${prefill?.source==="order"?"selected":""}>📝 Tilaus</option>
     </select>
   </div>
   <div id="whatsappTrackingField" class="field full" style="display:${prefill?.source==="whatsapp"?"block":"none"};">
@@ -588,7 +616,7 @@ function openIntake(prefill=null){
   <div class="field"><label>Asiakas</label><input id="n" value="${prefill?.name||""}" placeholder="Nimi tai kuitin numero" oninput="delete this.dataset.auto"></div>
   <div class="field"><label>Puhelin</label><input id="p" value="${prefill?.phone||""}" placeholder="040..."></div>
   <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()"></div>
-  <div class="field"><label>Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
+  <div class="field"><label id="workLabel">Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
   <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"><small id="priceHint" style="display:none;color:var(--teal);font-weight:600;"></small></div>
   <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" min="${localISO(new Date())}" oninput="document.getElementById('dateHint').style.display='none';"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
   <div class="field full"><label>Hylly / sijainti</label><input id="loc" value="A1-01" placeholder="A3-07"></div>
@@ -616,7 +644,7 @@ function openIntake(prefill=null){
   <button class="save" onclick="saveJob(false)" style="background:var(--primary); color:white; border:0;">TALLENNA & VALMIS</button>
 </div>`;
   document.getElementById("modal").classList.remove("hidden");
-  toggleWhatsappTracking();
+  toggleSourceFields();
 }
 
 async function saveJob(addAnother = false){
@@ -687,7 +715,7 @@ async function saveJob(addAnother = false){
       name:document.getElementById("n").value||"Uusi asiakas",
       phone:document.getElementById("p").value||"",
       product:document.getElementById("prod").value||"Tuote",
-      work:document.getElementById("work").value||"Korjaus",
+      work:document.getElementById("work").value||(source==="order"?"Tilaus":"Korjaus"),
       price:+document.getElementById("price").value||0,
       date:d?d.split("-").reverse().join("."):todayDateStr(),
       status,
@@ -1148,7 +1176,7 @@ function renderJobs(){
 
   const checkboxCell = j => bulkMode ? `<div onclick="event.stopPropagation()"><input type="checkbox" class="job-row-check" ${selectedJobIds.has(j.id)?"checked":""} onchange="toggleJobSelect('${j.id}', this.checked)"></div>` : "";
   const tableHead = `<div class="table-head">${bulkMode?"<div></div>":""}<div></div><div>Asiakas</div><div>Tuote / Työ</div><div>Toimitus</div><div>Hinta</div><div>Tila</div></div>`;
-  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')">${checkboxCell(j)}<div style="position:relative;"><img class="row-thumb" src="${j.img||bag}" title="${j.id}">${j.source==="whatsapp"?'<span class="row-thumb-badge">💬</span>':""}</div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div onclick="event.stopPropagation()"><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Päivitä tila">${statusLabel[j.status]||j.status}</span></div></div>`;
+  const rowHtml = j => `<div class="table-row" onclick="openJob('${j.id}')">${checkboxCell(j)}<div style="position:relative;"><img class="row-thumb" src="${j.img||bag}" title="${j.id}">${j.source==="whatsapp"?'<span class="row-thumb-badge">💬</span>':j.source==="order"?'<span class="row-thumb-badge">📝</span>':""}</div><div><b>${j.name}</b><small>${j.loc}</small></div><div><b>${j.product}</b><small>${j.work}</small></div><div>${j.date}</div><div><b>${j.price} €</b></div><div onclick="event.stopPropagation()"><span class="pill ${statusPillClass(j.status)}" onclick="openStatus('${j.id}')" title="Päivitä tila">${statusLabel[j.status]||j.status}</span></div></div>`;
   const empty = `<p style="text-align:center;color:var(--text-muted);padding:30px 0;">Ei töitä.</p>`;
   document.getElementById("jobsTable").classList.toggle("bulk-mode", bulkMode);
   // Delivery dates in the past or today surface first — those are the ones
@@ -1252,6 +1280,29 @@ async function uploadDetailAfterImage(e, id) {
   }
 }
 
+async function uploadDetailBeforeImage(e, id) {
+  const f = e.target.files?.[0];
+  if(!f) return;
+
+  const preview = document.getElementById("detailBeforePreview");
+  try {
+    const displayFile = await toDisplayableImage(f);
+    preview.src = URL.createObjectURL(displayFile);
+
+    const url = await uploadJobImage(displayFile, id, "before");
+    const j = jobs.find(x => x.id === id);
+    if(j) {
+      j.img = url;
+      saveState();
+      dbUpdateJobImage(id, url);
+      renderJobs();
+    }
+  } catch (err) {
+    console.error("Before-photo upload failed:", err);
+    alert("Kuvan lataus epäonnistui. Yritä uudelleen.");
+  }
+}
+
 function openJob(id){
   const j=jobs.find(x=>x.id===id);
   document.getElementById("jobNo").textContent=j.id;
@@ -1262,9 +1313,10 @@ function openJob(id){
   document.getElementById("jobDetail").innerHTML=`<div class="detail-grid">
     <div class="detail">
       <div style="display:flex;gap:16px;align-items:center;margin-bottom:15px;">
-        <div style="position:relative;">
-          <img src="${j.img}" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid #e6edef;">
+        <div style="position:relative;cursor:pointer;" onclick="document.getElementById('detailBeforeFile').click()">
+          <img src="${j.img}" id="detailBeforePreview" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid #e6edef;">
           <span style="position:absolute;bottom:4px;left:4px;background:rgba(15,45,74,0.85);color:white;font-size:9px;padding:2px 6px;border-radius:4px;font-weight:700">ENNEN</span>
+          <input type="file" id="detailBeforeFile" accept="image/*" style="display:none" onchange="uploadDetailBeforeImage(event, '${j.id}')">
         </div>
         <div style="position:relative;cursor:pointer;" onclick="document.getElementById('detailAfterFile').click()">
           <img src="${j.img_after || bag}" id="detailAfterPreview" style="width:110px;height:110px;object-fit:cover;border-radius:8px;border:1px solid #e6edef;opacity:${j.img_after ? 1 : 0.4};">
@@ -1275,7 +1327,7 @@ function openJob(id){
       <div>
         <h2 style="margin:0 0 5px;font-size:18px">${j.name}</h2>
         <p style="font-size:12px;color:#7d8990;margin:0 0 5px;">${j.product}</p>
-        <span class="pill teal">${j.loc}</span>${j.source==="whatsapp"?' <span class="pill" style="background:#e8f7f7;color:#138c8c;">💬 WhatsApp</span>':""}
+        <span class="pill teal">${j.loc}</span>${j.source==="whatsapp"?' <span class="pill" style="background:#e8f7f7;color:#138c8c;">💬 WhatsApp</span>':j.source==="order"?' <span class="pill" style="background:#fdf2e3;color:#b4790a;">📝 Tilaus</span>':""}
       </div>
       <hr style="border:0;border-top:1px solid #e6edef;margin:18px 0">
       <b style="font-size:11px">Työ</b><p style="font-size:13px">${j.work} · <strong>${j.price} €</strong></p>
@@ -1902,7 +1954,7 @@ async function changePassword() {
   statusEl.style.color = "var(--teal)";
 }
 
-const SOURCE_META={store:{code:"S",label:"Myymälä",icon:"🏪"},whatsapp:{code:"W",label:"WhatsApp",icon:"💬"}};
+const SOURCE_META={store:{code:"S",label:"Myymälä",icon:"🏪"},whatsapp:{code:"W",label:"WhatsApp",icon:"💬"},order:{code:"O",label:"Tilaus",icon:"📝"}};
 
 function jobCreatedDateStr(j){
   // created_at comes back from Supabase as an ISO timestamp; fall back to
@@ -1982,12 +2034,10 @@ function renderIntakeChart(){
   </svg>`;
 }
 
-function getExportData(){
-  let f=document.getElementById("exportFrom")?.value||"",t=document.getElementById("exportTo")?.value||"",s=document.getElementById("exportSource")?.value||"all",st=document.getElementById("exportStatus")?.value||"all";
-  return jobs.filter(j=>{
-    const created = jobCreatedDateStr(j);
-    return (!f||created>=f)&&(!t||created<=t)&&(s==="all"||j.source===s||(s==="store"&&!j.source))&&(st==="all"||j.status===st);
-  });
+// Local-calendar-date ISO string — new Date(...).toISOString() converts to
+// UTC first, which rolls the date back a day in Finland's UTC+2/+3 zone.
+function localISO(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
 }
 
 function isoToFin(iso){
@@ -1996,100 +2046,132 @@ function isoToFin(iso){
   return `${Number(day)}.${Number(m)}.${y}`;
 }
 
-// Local-calendar-date ISO string — new Date(...).toISOString() converts to
-// UTC first, which rolls the date back a day in Finland's UTC+2/+3 zone.
-function localISO(d){
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+// Clear, exact service-type keywords this shop actually uses — checked
+// against product+work text (lowercased). Anything that doesn't match
+// falls into "Muu" rather than guessing at looser synonyms. Order matters:
+// "luistimien teroitus" (skate sharpening) should count as Luistimet, not
+// Teroitus, so skates is checked first.
+const JOB_CATEGORIES = [
+  { key:"skates", label:"Luistimet", icon:"⛸️", words:["luisti"] },
+  { key:"shoes", label:"Kengät", icon:"👞", words:["keng","saappa","tossu"] },
+  { key:"bags", label:"Laukut", icon:"👜", words:["laukku","reppu"] },
+  { key:"sharpening", label:"Teroitus", icon:"🔪", words:["terot"] },
+  { key:"other", label:"Muu", icon:"🔧", words:[] },
+];
+function jobCategory(j){
+  const text = `${j.product||""} ${j.work||""}`.toLowerCase();
+  return JOB_CATEGORIES.find(c => c.words.some(w => text.includes(w))) || JOB_CATEGORIES[JOB_CATEGORIES.length-1];
 }
 
-let reportsActivePeriod = "month";
-function setReportPeriod(kind){
-  const fromEl=document.getElementById("exportFrom"), toEl=document.getElementById("exportTo");
-  const d=new Date();
-  if(kind==="today"){
-    const iso=localISO(d);
-    fromEl.value=iso;
-    toEl.value=iso;
-  } else if(kind==="week"){
-    const dow=(d.getDay()+6)%7; // Monday = 0
-    const monday=new Date(d); monday.setDate(d.getDate()-dow);
-    const sunday=new Date(monday); sunday.setDate(monday.getDate()+6);
-    fromEl.value=localISO(monday);
-    toEl.value=localISO(sunday);
-  } else if(kind==="month"){
-    fromEl.value=localISO(new Date(d.getFullYear(), d.getMonth(), 1));
-    toEl.value=localISO(new Date(d.getFullYear(), d.getMonth()+1, 0));
-  } else if(kind==="year"){
-    fromEl.value=localISO(new Date(d.getFullYear(), 0, 1));
-    toEl.value=localISO(new Date(d.getFullYear(), 11, 31));
-  } else {
-    fromEl.value="";
-    toEl.value="";
-  }
-  reportsActivePeriod = kind;
+// YYYY-MM of the month currently shown in Raportit.
+let reportMonth = localISO(new Date()).slice(0,7);
+
+function changeReportMonth(delta){
+  const [y,m] = reportMonth.split("-").map(Number);
+  const d = new Date(y, m-1+delta, 1);
+  reportMonth = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}`;
+  const input = document.getElementById("reportMonthInput");
+  if(input) input.value = reportMonth;
   renderReports();
 }
 
-function highlightReportPeriod(){
-  document.querySelectorAll(".export-btn[data-period]").forEach(btn=>{
-    btn.classList.toggle("primary", btn.dataset.period===reportsActivePeriod);
-  });
+function onReportMonthInputChange(){
+  reportMonth = document.getElementById("reportMonthInput")?.value || reportMonth;
+  renderReports();
 }
 
-// Only auto-scope the reports view to the current month the first time it's
-// opened in a session — after that, whatever period the user picked (incl.
-// "Kaikki ajat") sticks until reload instead of being reset on every visit.
+// Jobs *received* this month (by intake date), regardless of status.
+function getMonthReceivedJobs(){
+  return jobs.filter(j => jobCreatedDateStr(j).slice(0,7) === reportMonth);
+}
+
+// Jobs actually *handed over* this month — grouped by delivered_at, the
+// timestamp stamped once at pickup, not the (possibly stale) `date` field.
+// See calendarDateKey() for the same reasoning applied to the calendar.
+function getMonthDeliveredJobs(){
+  return jobs.filter(j => j.status==="done" && j.delivered_at && localISO(new Date(j.delivered_at)).slice(0,7) === reportMonth);
+}
+
+// Every day that's ever had a delivery, mapped to that day's revenue — the
+// full history, not just the selected month, because the "record day"
+// highlight needs to compare against all-time, not reset every month.
+function dailyRevenueMap(){
+  const map = {};
+  jobs.forEach(j=>{
+    if(j.status==="done" && j.delivered_at){
+      const iso = localISO(new Date(j.delivered_at));
+      map[iso] = (map[iso]||0) + (Number(j.price)||0);
+    }
+  });
+  return map;
+}
+
+// Walking the full history chronologically, a day is a "record" the moment
+// its revenue beats every day before it — so the first green day is simply
+// the best one seen so far, and later months only light up again once they
+// actually beat that number, exactly like a running best.
+function recordRevenueDays(map){
+  const records = new Set();
+  let runningMax = 0;
+  Object.keys(map).sort().forEach(iso=>{
+    if(map[iso] > runningMax){
+      runningMax = map[iso];
+      records.add(iso);
+    }
+  });
+  return records;
+}
+
+function getExportData(){
+  return getMonthReceivedJobs();
+}
+
 let reportsPeriodInitialized = false;
 function initReportsPeriod(){
-  if(reportsPeriodInitialized) { renderReports(); return; }
-  reportsPeriodInitialized = true;
-  setReportPeriod("month");
+  if(!reportsPeriodInitialized){
+    reportsPeriodInitialized = true;
+    const input = document.getElementById("reportMonthInput");
+    if(input) input.value = reportMonth;
+  }
+  renderReports();
 }
 
 function renderReports(){
-  let d=getExportData();
-  let delivered=d.filter(j=>j.status==="done"), pending=d.filter(j=>j.status!=="done");
-  let deliveredRevenue=delivered.reduce((a,j)=>a+(Number(j.price)||0),0);
-  let pendingRevenue=pending.reduce((a,j)=>a+(Number(j.price)||0),0);
+  const received = getMonthReceivedJobs();
+  const delivered = getMonthDeliveredJobs();
+  const revenue = delivered.reduce((a,j)=>a+(Number(j.price)||0),0);
 
-  document.getElementById("rTotal").textContent=d.length;
-  document.getElementById("rConverted").textContent=delivered.length;
-  document.getElementById("rDeliveredRevenue").textContent="€"+deliveredRevenue+" tuottoa";
-  document.getElementById("rPending").textContent=pending.length;
-  document.getElementById("rPendingRevenue").textContent="€"+pendingRevenue+" arvoltaan";
+  document.getElementById("rReceivedCount").textContent = received.length;
+  document.getElementById("rDeliveredCount").textContent = delivered.length;
+  document.getElementById("rRevenue").textContent = "€"+revenue;
 
-  const fromVal=document.getElementById("exportFrom").value, toVal=document.getElementById("exportTo").value;
-  document.getElementById("rPeriodLabel").textContent = (fromVal||toVal) ? `${isoToFin(fromVal)||"…"} – ${isoToFin(toVal)||"…"}` : "Kaikki ajat";
-  highlightReportPeriod();
+  const catCounts = {};
+  JOB_CATEGORIES.forEach(c => catCounts[c.key] = 0);
+  received.forEach(j => catCounts[jobCategory(j).key]++);
+  const catMax = Math.max(1, ...Object.values(catCounts));
+  document.getElementById("categoryStats").innerHTML = JOB_CATEGORIES.map(c=>{
+    const n = catCounts[c.key];
+    return `<div class="source-row"><span>${c.icon} ${c.label}</span><div class="bar"><i style="width:${n/catMax*100}%"></i></div><b>${n}</b></div>`;
+  }).join("");
 
-  // Still-open deliveries for the reference day — always "today" (or, after
-  // closing time, "tomorrow" — see referenceDateStr()), regardless of the
-  // period filter above.
-  const afterClosingReports = isAfterClosing();
-  const dueRefReportJobs = jobs.filter(j => j.date===referenceDateStr() && j.status!=="done");
-  document.getElementById("rDueTodayLabel").textContent = afterClosingReports ? "Huomenna toimitettavana" : "Tänään toimitettavana";
-  document.getElementById("rDueTodayCount").textContent = dueRefReportJobs.length;
-  document.getElementById("rDueTodayRevenue").textContent = "€"+dueRefReportJobs.reduce((a,j)=>a+(Number(j.price)||0),0);
-
-  // Both breakdowns below read from `d` (the date/kanava/tila-filtered set),
-  // not the raw `jobs` array — otherwise they'd stay frozen at all-time
-  // totals no matter what filters were picked above, which is what made the
-  // whole page look unresponsive to the date pickers.
-  let src=document.getElementById("sourceStats"),sourceKeys=["store","whatsapp"],mx=Math.max(1,...sourceKeys.map(s=>d.filter(j=>(j.source||"store")===s).length));
-  src.innerHTML=sourceKeys.map(s=>{let n=d.filter(j=>(j.source||"store")===s).length,m=SOURCE_META[s];return `<div class="source-row"><span>${m.icon} ${m.label}</span><div class="bar"><i style="width:${n/mx*100}%"></i></div><b>${n}</b></div>`}).join("");
-
-  let sts=[["waiting","Odottaa"],["arrived","Tuote saapui"],["active","Työn alla"],["late","Myöhässä"],["ready","Valmis"],["done","Luovutettu"]],sm=Math.max(1,...sts.map(x=>d.filter(j=>j.status===x[0]).length));
-  document.getElementById("statusStats").innerHTML=sts.map(x=>{let n=d.filter(j=>j.status===x[0]).length;return `<div class="status-row"><span>${x[1]}</span><div class="bar"><i style="width:${n/sm*100}%"></i></div><b>${n}</b></div>`}).join("");
-
-  document.getElementById("exportTable").innerHTML=d.map(j=>`<tr><td>${j.id}</td><td><span class="source-pill">${SOURCE_META[j.source||"store"]?.icon||""} ${SOURCE_META[j.source||"store"]?.label||j.source}</span></td><td>${j.name||""}</td><td>${jobCreatedDateStr(j)}</td><td>${j.product||""}</td><td>${j.work||""}</td><td><span class="status-pill">${statusLabel[j.status]||j.status||""}</span></td><td>${j.price!==""&&j.price!=null?"€"+j.price:""}</td></tr>`).join("")||'<tr><td colspan="8" class="empty-row">Ei hakuehtoja vastaavia tietoja.</td></tr>';
-  document.getElementById("previewCount").textContent=d.length+" työtä";
+  const revMap = dailyRevenueMap();
+  const records = recordRevenueDays(revMap);
+  const [ry, rm] = reportMonth.split("-").map(Number);
+  const daysInMonth = new Date(ry, rm, 0).getDate();
+  let rows = "";
+  for(let day=1; day<=daysInMonth; day++){
+    const iso = `${ry}-${String(rm).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
+    const amount = revMap[iso];
+    if(!amount) continue;
+    const isRecord = records.has(iso);
+    rows += `<div class="daily-rev-row${isRecord?" record":""}"><span>${day}.${rm}.${ry}</span><b>€${amount}</b>${isRecord?'<span title="Ennätyspäivä">🏆</span>':"<span></span>"}</div>`;
+  }
+  document.getElementById("dailyRevenueList").innerHTML = rows || '<p style="color:var(--text-muted);font-size:12px;">Ei toimitettuja töitä tässä kuussa.</p>';
 }
 
 function csvRows(){let d=getExportData();return [["Työ ID","Lähde","Asiakas","Päivämäärä","Tuote","Korjaus","Tila","Hinta"],...d.map(j=>[j.id,SOURCE_META[j.source||"store"]?.label||j.source,j.name,jobCreatedDateStr(j),j.product,j.work,statusLabel[j.status]||j.status,j.price])]}
-function exportCSV(){let rows=csvRows(),csv="\uFEFF"+rows.map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="tehtaankatu_suutari_export.csv";a.click()}
-function exportExcel(){let rows=csvRows(),table="<table><tr>"+rows[0].map(x=>`<th>${x}</th>`).join("")+"</tr>"+rows.slice(1).map(r=>"<tr>"+r.map(x=>`<td>${x??""}</td>`).join("")+"</tr>").join("")+"</table>",a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["\ufeff<html><meta charset='UTF-8'><body>"+table+"</body></html>"],{type:"application/vnd.ms-excel"}));a.download="tehtaankatu_suutari_export.xls";a.click()}
-["exportFrom","exportTo"].forEach(id=>document.getElementById(id)?.addEventListener("change",()=>{reportsActivePeriod=null; renderReports();}));
-["exportSource","exportStatus"].forEach(id=>document.getElementById(id)?.addEventListener("change",renderReports));
+function exportCSV(){let rows=csvRows(),csv="﻿"+rows.map(row=>row.map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(",")).join("\n"),a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download="tehtaankatu_suutari_export.csv";a.click()}
+function exportExcel(){let rows=csvRows(),table="<table><tr>"+rows[0].map(x=>`<th>${x}</th>`).join("")+"</tr>"+rows.slice(1).map(r=>"<tr>"+r.map(x=>`<td>${x??""}</td>`).join("")+"</tr>").join("")+"</table>",a=document.createElement("a");a.href=URL.createObjectURL(new Blob(["﻿<html><meta charset='UTF-8'><body>"+table+"</body></html>"],{type:"application/vnd.ms-excel"}));a.download="tehtaankatu_suutari_export.xls";a.click()}
 
 // Settings operations
 function saveSettings() {

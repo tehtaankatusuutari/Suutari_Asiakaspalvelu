@@ -385,8 +385,8 @@
   <div class="hero">
     <div>
       <div class="eyebrow">Raportointi</div>
-      <h1>Raportit & Vienti</h1>
-      <p>Tulot kanavittain, konversioasteet ja datan vienti.</p>
+      <h1>Raportit</h1>
+      <p>Valitse kuukausi ja näet sen luvut.</p>
     </div>
     <div class="export-actions">
       <button class="export-btn" onclick="exportCSV()">Lataa CSV</button>
@@ -394,103 +394,44 @@
     </div>
   </div>
 
-  <div class="filter-grid card">
-    <label>Alkupäivämäärä
-      <input type="date" id="exportFrom">
-    </label>
-    <label>Loppupäivämäärä
-      <input type="date" id="exportTo">
-    </label>
-    <label>Kanava
-      <select id="exportSource">
-        <option value="all">Kaikki kanavat</option>
-        <option value="store">Myymälä</option>
-        <option value="whatsapp">WhatsApp</option>
-      </select>
-    </label>
-    <label>Tila
-      <select id="exportStatus">
-        <option value="all">Kaikki tilat</option>
-        <option value="waiting">Odottaa</option>
-        <option value="arrived">Tuote saapui</option>
-        <option value="active">Työn alla</option>
-        <option value="late">Myöhässä</option>
-        <option value="ready">Valmis</option>
-        <option value="done">Luovutettu</option>
-      </select>
-    </label>
-  </div>
-  <div style="display:flex; gap:8px; margin:12px 0 4px; flex-wrap:wrap;">
-    <button class="export-btn" data-period="today" onclick="setReportPeriod('today')">Tänään</button>
-    <button class="export-btn" data-period="week" onclick="setReportPeriod('week')">Tämä viikko</button>
-    <button class="export-btn" data-period="month" onclick="setReportPeriod('month')">📅 Tämä kuukausi</button>
-    <button class="export-btn" data-period="year" onclick="setReportPeriod('year')">Tämä vuosi</button>
-    <button class="export-btn" data-period="all" onclick="setReportPeriod('all')">Kaikki ajat</button>
+  <div class="month-nav">
+    <button class="export-btn" onclick="changeReportMonth(-1)">◄</button>
+    <input type="month" id="reportMonthInput" onchange="onReportMonthInputChange()">
+    <button class="export-btn" onclick="changeReportMonth(1)">►</button>
   </div>
 
-  <div class="stats-grid">
+  <div class="stats-grid stats-grid-3">
     <div class="stat-card">
-      <span>Yhteensä töitä</span>
-      <strong id="rTotal">0</strong>
-      <small id="rPeriodLabel">Valittu jakso</small>
+      <span>Vastaanotetut työt</span>
+      <strong id="rReceivedCount">0</strong>
+      <small>Kuukauden aikana tulleet</small>
     </div>
     <div class="stat-card">
-      <span>Luovutettu (jakso)</span>
-      <strong id="rConverted">0</strong>
-      <small id="rDeliveredRevenue">€0 tuottoa</small>
+      <span>Toimitetut työt</span>
+      <strong id="rDeliveredCount">0</strong>
+      <small>Kuukauden aikana luovutetut</small>
     </div>
     <div class="stat-card">
-      <span>Odottaa toimitusta (jakso)</span>
-      <strong id="rPending">0</strong>
-      <small id="rPendingRevenue">€0 arvoltaan</small>
-    </div>
-    <div class="stat-card">
-      <span id="rDueTodayLabel">Tänään toimitettavana</span>
-      <strong id="rDueTodayCount">0</strong>
-      <small id="rDueTodayRevenue">€0</small>
+      <span>Liikevaihto</span>
+      <strong id="rRevenue">€0</strong>
+      <small>Toimitetuista töistä</small>
     </div>
   </div>
 
-  <div class="report-grid">
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Työt kanavittain</h2>
-        <span>Kanavajakauma</span>
-      </div>
-      <div id="sourceStats"></div>
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Työt tyypeittäin</h2>
+      <span>Vastaanotetut työt</span>
     </div>
-    <div class="panel">
-      <div class="panel-head">
-        <h2>Töiden tilajakauma</h2>
-        <span>Vaiheet</span>
-      </div>
-      <div id="statusStats"></div>
-    </div>
+    <div id="categoryStats"></div>
   </div>
 
   <div class="panel data-panel">
     <div class="panel-head">
-      <h2>Datan esikatselu</h2>
-      <span id="previewCount">0 työtä</span>
+      <h2>Päivittäinen liikevaihto</h2>
+      <span>🏆 = ennätyspäivä</span>
     </div>
-    <div class="table-wrap">
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Työ ID</th>
-            <th>Lähde</th>
-            <th>Asiakas</th>
-            <th>Päivämäärä</th>
-            <th>Tuote</th>
-            <th>Korjaus</th>
-            <th>Tila</th>
-            <th>Hinta</th>
-          </tr>
-        </thead>
-        <tbody id="exportTable"></tbody>
-      </table>
-    </div>
-    <div class="export-note">Yllä oleva taulukko esikatseli suodatettuja tietoja. Voit ladata kaikki tiedot CSV- tai Excel-painikkeilla.</div>
+    <div id="dailyRevenueList"></div>
   </div>
 </section>
 
@@ -657,6 +598,6 @@
 <div id="printReceipt"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20260923_1200"></script>
+<script src="app.js?v=20261003_1100"></script>
 </body>
 </html>
