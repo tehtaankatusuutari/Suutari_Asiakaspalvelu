@@ -499,32 +499,29 @@ main {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   display: inline-block;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
-/* Solid backgrounds + white text (not the softer tinted look) so a status
-   reads at a glance across the Työt list, Tänään cards and the calendar —
-   red = myöhässä, purple = odottaa/tuote saapui, orange = valmis (odottaa
-   noutoa) — kept distinct from teal (työn alla) and blue on purpose so the
-   two "waiting on something" states can't be mistaken for each other,
-   green = luovutettu, teal = työn alla. */
 .pill.red {
-  background: #dc2626;
+  background: linear-gradient(180deg, #ef4444 0%, #dc2626 100%);
   color: #fff;
 }
 .pill.orange {
-  background: #ea580c;
+  background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
   color: #fff;
 }
 .pill.teal {
-  background: var(--teal);
+  background: linear-gradient(180deg, #14b8a6 0%, #0d9488 100%);
   color: #fff;
 }
 .pill.green {
-  background: #16a34a;
+  background: linear-gradient(180deg, #22c55e 0%, #16a34a 100%);
   color: #fff;
 }
 .pill.purple {
-  background: #7c3aed;
+  background: linear-gradient(180deg, #8b5cf6 0%, #7c3aed 100%);
   color: #fff;
 }
 
@@ -900,42 +897,62 @@ main {
   padding: 16px 24px;
 }
 
-/* Quick Status Action Buttons */
+/* Quick Status Action Buttons (3D Tactile Design) */
 .quick-status-btn {
   border: 0;
-  border-radius: var(--radius-sm);
-  padding: 5px 9px;
-  font: 700 11px var(--font-heading);
+  border-radius: 20px;
+  padding: 4px 11px;
+  font-size: 10px;
+  font-weight: 800;
+  font-family: var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
   display: inline-flex;
   align-items: center;
   gap: 4px;
   white-space: nowrap;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   line-height: 1.2;
+  position: relative;
+  user-select: none;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
 }
 
 .quick-status-btn.ready-btn {
-  background: #ea580c;
+  background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
   color: #ffffff;
+  box-shadow: 0 3px 0 #c2410c, 0 4px 10px rgba(234, 88, 12, 0.35);
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .quick-status-btn.ready-btn:hover {
-  background: #c2410c;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(234, 88, 12, 0.3);
+  background: linear-gradient(180deg, #fb923c 0%, #f97316 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 #c2410c, 0 6px 15px rgba(234, 88, 12, 0.45);
+}
+
+.quick-status-btn.ready-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #c2410c, 0 2px 5px rgba(234, 88, 12, 0.3);
 }
 
 .quick-status-btn.done-btn {
-  background: #10b981;
+  background: linear-gradient(180deg, #10b981 0%, #059669 100%);
   color: #ffffff;
+  box-shadow: 0 3px 0 #047857, 0 4px 10px rgba(16, 185, 129, 0.35);
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
 }
 
 .quick-status-btn.done-btn:hover {
-  background: #059669;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+  background: linear-gradient(180deg, #34d399 0%, #10b981 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 5px 0 #047857, 0 6px 15px rgba(16, 185, 129, 0.45);
+}
+
+.quick-status-btn.done-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 #047857, 0 2px 5px rgba(16, 185, 129, 0.3);
 }
 
 .toast-msg {
