@@ -2566,32 +2566,41 @@ main {
   background: #fff;
 }
 
-.daily-rev-row {
-  display: grid;
-  grid-template-columns: 110px 1fr 24px;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
+.daily-pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.daily-pill-blue {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.daily-pill-purple {
+  background: #f3e8ff;
+  color: #6b21a8;
+}
+
+.daily-stats-table tr.record-row {
+  background: #eafaf0 !important;
+}
+
+.daily-stats-table tr.record-row td {
+  color: #0f7a4e;
+}
+
+.daily-stats-table tr.record-row td b {
+  color: #0f7a4e;
+}
+
+.daily-total-row td {
+  background: #f1f5f9;
+  border-top: 2px solid var(--border-color) !important;
   font-size: 12px;
-  color: var(--primary);
-  border-radius: var(--radius-sm);
-}
-
-.daily-rev-row:nth-child(odd) {
-  background: #f8fbfc;
-}
-
-.daily-rev-row b {
-  font-weight: 800;
-}
-
-.daily-rev-row.record {
-  background: #eafaf0;
-  color: #0f7a4e;
-}
-
-.daily-rev-row.record b {
-  color: #0f7a4e;
+  padding: 12px 14px !important;
 }
 
 .stat-card {

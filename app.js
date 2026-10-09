@@ -2245,15 +2245,101 @@ function renderReports(){
   const records = recordRevenueDays(revMap);
   const [ry, rm] = reportMonth.split("-").map(Number);
   const daysInMonth = new Date(ry, rm, 0).getDate();
-  let rows = "";
-  for(let day=1; day<=daysInMonth; day++){
-    const iso = `${ry}-${String(rm).padStart(2,"0")}-${String(day).padStart(2,"0")}`;
-    const amount = revMap[iso];
-    if(!amount) continue;
-    const isRecord = records.has(iso);
-    rows += `<div class="daily-rev-row${isRecord?" record":""}"><span>${day}.${rm}.${ry}</span><b>€${amount}</b>${isRecord?'<span title="Ennätyspäivä">🏆</span>':"<span></span>"}</div>`;
+
+  // Maps for received and delivered jobs by ISO date string (YYYY-MM-DD)
+  const incomingByDate = {};
+  received.forEach(j => {
+    const iso = jobCreatedDateStr(j);
+    if (!iso) return;
+    if (!incomingByDate[iso]) incomingByDate[iso] = { count: 0, sum: 0 };
+    incomingByDate[iso].count++;
+    incomingByDate[iso].sum += (Number(j.price) || 0);
+  });
+
+  const deliveredByDate = {};
+  delivered.forEach(j => {
+    if (j.status === "done" && j.delivered_at) {
+      const iso = localISO(new Date(j.delivered_at));
+      if (!deliveredByDate[iso]) deliveredByDate[iso] = { count: 0, sum: 0 };
+      deliveredByDate[iso].count++;
+      deliveredByDate[iso].sum += (Number(j.price) || 0);
+    }
+  });
+
+  let rowsHtml = "";
+  let totalIncCount = 0;
+  let totalIncSum = 0;
+  let totalDelCount = 0;
+  let totalDelSum = 0;
+  let activeDaysCount = 0;
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    const iso = `${ry}-${String(rm).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const inc = incomingByDate[iso] || { count: 0, sum: 0 };
+    const del = deliveredByDate[iso] || { count: 0, sum: 0 };
+
+    if (inc.count === 0 && del.count === 0) continue;
+
+    activeDaysCount++;
+    totalIncCount += inc.count;
+    totalIncSum += inc.sum;
+    totalDelCount += del.count;
+    totalDelSum += del.sum;
+
+    const isRecord = records.has(iso) && del.sum > 0;
+    const formattedDate = `${day}.${rm}.${ry}`;
+
+    const incStr = inc.count > 0 
+      ? `<span class="daily-pill daily-pill-blue">${inc.count} kpl</span> <span style="color:var(--text-muted);font-size:11px;">(€${inc.sum})</span>`
+      : `<span style="color:var(--text-light);font-size:11px;">—</span>`;
+
+    const delStr = del.count > 0 
+      ? `<span class="daily-pill daily-pill-purple">${del.count} kpl</span>`
+      : `<span style="color:var(--text-light);font-size:11px;">—</span>`;
+
+    const revStr = del.sum > 0
+      ? `<b>€${del.sum}</b>${isRecord ? ' <span title="Ennätyspäivä">🏆</span>' : ''}`
+      : `<span style="color:var(--text-light);">€0</span>`;
+
+    rowsHtml += `
+      <tr class="${isRecord ? 'record-row' : ''}">
+        <td><b>${formattedDate}</b></td>
+        <td>${incStr}</td>
+        <td>${delStr}</td>
+        <td style="text-align:right;">${revStr}</td>
+      </tr>
+    `;
   }
-  document.getElementById("dailyRevenueList").innerHTML = rows || '<p style="color:var(--text-muted);font-size:12px;">Ei toimitettuja töitä tässä kuussa.</p>';
+
+  if (activeDaysCount > 0) {
+    document.getElementById("dailyRevenueList").innerHTML = `
+      <div class="table-wrap">
+        <table class="data-table daily-stats-table">
+          <thead>
+            <tr>
+              <th>Päivämäärä</th>
+              <th>Vastaanotetut työt (määrä & arvo)</th>
+              <th>Luovutetut työt (määrä)</th>
+              <th style="text-align:right;">Päivän liikevaihto</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+          <tfoot>
+            <tr class="daily-total-row">
+              <td><b>Yhteensä (${activeDaysCount} pv)</b></td>
+              <td><b>${totalIncCount} kpl <span style="font-weight:normal;color:var(--text-muted);">(€${totalIncSum})</span></b></td>
+              <td><b>${totalDelCount} kpl</b></td>
+              <td style="text-align:right;"><b style="color:var(--teal);font-size:13px;">€${totalDelSum}</b></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    `;
+  } else {
+    document.getElementById("dailyRevenueList").innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:15px 0;text-align:center;">Ei saapuneita tai luovutettuja töitä tässä kuussa.</p>';
+  }
 }
 
 function csvRows(){let d=getExportData();return [["Työ ID","Lähde","Asiakas","Päivämäärä","Tuote","Korjaus","Tila","Hinta"],...d.map(j=>[j.id,SOURCE_META[j.source||"store"]?.label||j.source,j.name,jobCreatedDateStr(j),j.product,j.work,statusLabel[j.status]||j.status,j.price])]}
