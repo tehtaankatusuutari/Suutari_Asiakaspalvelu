@@ -281,7 +281,7 @@ hr {
   <h1>Tilauskysely</h1>
   <p class="subtitle">Syötä tilausnumero (kortin numero, jonka sait tuodessasi tuotteen) tähän ja paina Hae.</p>
 
-  <img class="explainer" src="tilauskysely-explainer.jpg" alt="Esimerkki: kortin numero (esim. 9591) syötetään hakukenttään">
+  <img class="explainer" id="explainerImg" src="tilauskysely-explainer.jpg" alt="Esimerkki: kortin numero (esim. 9591) syötetään hakukenttään">
 
   <div class="search-box">
     <input type="text" id="trackCode" placeholder="Esim. 9591" inputmode="numeric" onkeydown="if(event.key==='Enter') trackJob()">
@@ -446,6 +446,7 @@ const params = new URLSearchParams(window.location.search);
 const codeParam = params.get("code");
 const ticketParam = params.get("ticket");
 if (codeParam) {
+  document.getElementById("explainerImg").style.display = "none";
   document.getElementById("trackCode").value = codeParam;
   trackJob();
 } else if (ticketParam) {
