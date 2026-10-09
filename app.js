@@ -136,29 +136,29 @@ function todayDateStr(){
 // reads referenceDateStr() instead of todayDateStr() so they all flip
 // together; actual-outcome figures (revenue earned, jobs delivered today,
 // the calendar's "today" cell) stay on the real date.
-const CLOSING_HOUR = 18;
+// Saturday closes early at 14:00; Monday–Friday at 18:00; Sunday is closed.
+function closingHourFor(d){
+  return d.getDay() === 6 ? 14 : 18;
+}
 function isAfterClosing(){
-  return new Date().getHours() >= CLOSING_HOUR;
+  const now = new Date();
+  return now.getHours() >= closingHourFor(now);
 }
 function referenceDateStr(){
-  const d = new Date();
-  if(isAfterClosing()) d.setDate(d.getDate()+1);
-  return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
+  const d = isAfterClosing() ? nextBusinessDay(new Date()) : new Date();
+  return toFinDateStr(d);
 }
 
 function toFinDateStr(d){
   return `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
 }
 
-// The next calendar day after `from`, pushed to Monday if it would
-// otherwise land on a Saturday or Sunday.
+// The next calendar day after `from`, skipping only Sunday (shop closed).
 function nextBusinessDay(from){
   const next = new Date(from);
   next.setHours(0,0,0,0);
   next.setDate(next.getDate() + 1);
-  const day = next.getDay(); // 0 = Sunday, 6 = Saturday
-  if(day === 6) next.setDate(next.getDate() + 2);
-  else if(day === 0) next.setDate(next.getDate() + 1);
+  if(next.getDay() === 0) next.setDate(next.getDate() + 1);
   return next;
 }
 
@@ -688,9 +688,8 @@ async function saveJob(addAnother = false){
     }
     if(d){
       const [dy, dm, dday] = d.split("-").map(Number);
-      const weekday = new Date(dy, dm-1, dday).getDay();
-      if(weekday === 0 || weekday === 6){
-        alert("Toimituspäivä ei voi olla viikonloppu — liike on kiinni. Valitse arkipäivä.");
+      if(new Date(dy, dm-1, dday).getDay() === 0){
+        alert("Toimituspäivä ei voi olla sunnuntai — liike on kiinni. Valitse toinen päivä.");
         return;
       }
     }
@@ -915,11 +914,9 @@ function suggestDeliveryDate(){
   const d = new Date();
   d.setDate(d.getDate() + 2);
   for(let i=0; i<60; i++){
-    const weekday = d.getDay();
-    // Shop is closed Sat/Sun (see nextBusinessDay) — those days always
-    // look "free" in the stats, so without this check the suggestion
-    // kept defaulting new jobs onto a day nobody's there to hand them out.
-    if(weekday !== 0 && weekday !== 6){
+    // Sundays are closed and look "free" in the stats, so skip them here or
+    // the suggestion keeps defaulting new jobs onto a day nobody's there.
+    if(d.getDay() !== 0){
       const dateStr = `${String(d.getDate()).padStart(2,"0")}.${String(d.getMonth()+1).padStart(2,"0")}.${d.getFullYear()}`;
       const count = stats[dateStr]?.count || 0;
       if(count <= 4) return { iso: localISO(d), fin: dateStr, count };
@@ -1437,9 +1434,8 @@ function saveEditJob(id){
   const d = document.getElementById("editDate").value;
   if(d){
     const [dy, dm, dday] = d.split("-").map(Number);
-    const weekday = new Date(dy, dm-1, dday).getDay();
-    if(weekday === 0 || weekday === 6){
-      alert("Toimituspäivä ei voi olla viikonloppu — liike on kiinni. Valitse arkipäivä.");
+    if(new Date(dy, dm-1, dday).getDay() === 0){
+      alert("Toimituspäivä ei voi olla sunnuntai — liike on kiinni. Valitse toinen päivä.");
       return;
     }
     j.date = d.split("-").reverse().join(".");
