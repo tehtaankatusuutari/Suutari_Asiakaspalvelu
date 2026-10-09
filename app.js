@@ -1308,11 +1308,17 @@ async function uploadDetailBeforeImage(e, id) {
   }
 }
 
+// Built from the page's own URL, not window.location.origin, because the app
+// is served from a subpath (github.io/<repo>/) and origin would drop it.
+function trackingUrl(id){
+  return new URL(`track.html?code=${encodeURIComponent(id)}`, window.location.href).href;
+}
+
 function openJob(id){
   const j=jobs.find(x=>x.id===id);
   document.getElementById("jobNo").textContent=j.id;
   
-  const trackUrl = `${window.location.origin}/track.html?code=${encodeURIComponent(j.id)}`;
+  const trackUrl = trackingUrl(j.id);
   const qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(trackUrl)}`;
 
   document.getElementById("jobDetail").innerHTML=`<div class="detail-grid">
@@ -1343,7 +1349,7 @@ function openJob(id){
         <img src="${qrLink}" style="width:75px;height:75px;border-radius:8px;border:1px solid #e6edef;">
         <div>
           <b style="font-size:11px">Asiakkaan seuranta (QR)</b>
-          <p style="font-size:11px;color:#71818a;margin:4px 0 0">Skannaa QR tai avaa linkki: <a href="track.html?code=${j.id}" target="_blank">${j.id}</a></p>
+          <p style="font-size:11px;color:#71818a;margin:4px 0 0">Skannaa QR tai avaa linkki: <a href="${trackingUrl(j.id)}" target="_blank">${j.id}</a></p>
         </div>
       </div>
     </div>
@@ -1363,7 +1369,7 @@ function openJob(id){
 // printer is already installed on the device (tablet or computer) — no
 // printer-specific code needed here.
 function buildReceiptHtml(j){
-  const trackUrl = `${window.location.origin}/track.html?code=${encodeURIComponent(j.id)}`;
+  const trackUrl = trackingUrl(j.id);
   const qrLink = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(trackUrl)}`;
   const now = new Date();
   const stamp = `${String(now.getDate()).padStart(2,"0")}.${String(now.getMonth()+1).padStart(2,"0")}.${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
@@ -1566,7 +1572,7 @@ function openNotificationModal(jobId, status) {
   const product = j.product || "tuote";
   const work = j.work || "korjaustyö";
   
-  const trackUrl = `${window.location.origin}/track.html?code=${encodeURIComponent(j.id)}`;
+  const trackUrl = trackingUrl(j.id);
   
   let msg = "";
   if (status === "ready") {
