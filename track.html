@@ -235,6 +235,24 @@ hr {
   color: var(--text-muted);
   margin-bottom: 4px;
 }
+.status-message {
+  margin: 0 0 15px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--primary-light);
+  color: var(--text);
+  font-weight: 600;
+}
+.status-message.ready {
+  background: #e6f7ef;
+  color: #0f7a4e;
+}
+.status-message.late {
+  background: #fdecec;
+  color: #b42318;
+}
 .not-found {
   font-size: 13px;
   color: var(--text-muted);
@@ -345,8 +363,20 @@ const statusLabel = {
   done: "Luovutettu asiakkaalle"
 };
 
+const statusMessage = {
+  waiting: "Odotamme vielä materiaalia tai tuotetta. Ilmoitamme, kun työ alkaa.",
+  arrived: "Tuotteesi on saapunut liikkeeseemme. Työ aloitetaan pian.",
+  active: "Tuotteesi on työn alla. Ilmoitamme, kun se on valmis.",
+  late: "Työ on hieman myöhässä. Pahoittelemme odotusta, työ valmistuu mahdollisimman pian.",
+  ready: "Tuotteesi on valmis! Voit hakea sen liikkeestämme.",
+  done: "Tuote on luovutettu. Kiitos asioinnista!"
+};
+
 function jobCardHtml(j) {
   const pillClass = j.status === "late" ? "red" : (j.status === "waiting" || j.status === "arrived") ? "orange" : "teal";
+  const messageHtml = statusMessage[j.status]
+    ? `<p class="status-message ${j.status}">${statusMessage[j.status]}</p>`
+    : "";
 
   const steps = [
     { label: "Vastaanotettu", status: "done" },
@@ -382,6 +412,7 @@ function jobCardHtml(j) {
         <h3>${j.id}</h3>
         <span class="status-pill ${pillClass}">${statusLabel[j.status] || j.status}</span>
       </div>
+      ${messageHtml}
       <div class="info-row"><span>Tuote:</span><strong>${j.product}</strong></div>
       <div class="info-row"><span>Tehty korjaus:</span><strong>${j.work}</strong></div>
       <div class="info-row"><span>Arvioitu toimitus:</span><strong>${j.date}</strong></div>
