@@ -435,7 +435,6 @@ function showPage(id){
   if(id==="calendar")renderCalendar();
   if(id==="customers")renderCustomers();
   if(id==="reports")initReportsPeriod();
-  if(id==="whatsapp")renderWhatsapp();
   if(id==="shelves")renderShelves();
   if(id==="social")renderSocial();
   if(id==="settings") {
@@ -465,7 +464,6 @@ function jobLine(j){return `<div class="job-line" onclick="openJob('${j.id}')"><
 
 function renderHome(){
   updateHeaderDate();
-  renderWhatsapp();
   document.getElementById("priority").innerHTML=jobs.slice(0,3).map(j=>`<div class="priority" onclick="openJob('${j.id}')"><div class="priority-top"><span class="pill ${statusPillClass(j.status)}" onclick="event.stopPropagation();openStatus('${j.id}')" title="Muut tilat">${(statusLabel[j.status]||j.status).toUpperCase()}</span><div onclick="event.stopPropagation()">${quickStatusBtn(j)}</div><b>${j.loc}</b></div><h3>${j.id} · ${j.name}</h3><p>${j.product}<br>${j.work} · ${j.price} €<br>Toimitus: ${j.date}</p></div>`).join("");
   renderMorningBrief();
   renderTodos();
@@ -1373,114 +1371,6 @@ async function uploadDetailBeforeImage(e, id) {
 // is served from a subpath (github.io/<repo>/) and origin would drop it.
 function trackingUrl(id){
   return new URL(`track.html?code=${encodeURIComponent(id)}`, window.location.href).href;
-}
-
-function waWaitingJobs(){
-  return jobs.filter(j => j.source === "whatsapp" && j.status === "waiting");
-}
-
-function waRowHtml(j){
-  const note = j.note ? `<small class="wa-note">${j.note}</small>` : "";
-  return `<div class="wa-row">
-    <div class="wa-info" onclick="openJob('${j.id}')"><b>${j.name}</b><small>${j.product} · ${j.work}</small>${note}</div>
-    <div class="wa-price">${j.price ? "€" + j.price : ""}</div>
-    <button class="wa-arrive" onclick="setStatus('${j.id}','arrived')">✅ Asiakas saapui</button>
-  </div>`;
-}
-
-function renderWhatsapp(){
-  const list = waWaitingJobs();
-  const empty = '<p class="wa-empty">Ei odottavia WhatsApp-tilauksia.</p>';
-  const countEl = document.getElementById("waCount");
-  if(countEl) countEl.textContent = `${list.length} odottavaa tilausta`;
-  const pageList = document.getElementById("waList");
-  if(pageList) pageList.innerHTML = list.map(waRowHtml).join("") || empty;
-  const homeList = document.getElementById("homeWaList");
-  if(homeList){
-    const more = list.length > 8 ? `<p class="wa-empty">+ ${list.length - 8} muuta — katso WhatsApp-sivulta</p>` : "";
-    homeList.innerHTML = list.slice(0,8).map(waRowHtml).join("") + more || empty;
-  }
-}
-
-function waImportKey(j){
-  return [j.name, j.product, j.work, j.note].map(v => String(v || "").trim().toLowerCase()).join("|");
-}
-
-function waJobFromRow(r){
-  const val = k => String(r[k] ?? "").trim();
-  const product = val("Tuote"), work = val("Korjaus");
-  if(!product && !work) return null;
-  const note = val("Sisäinen huomautus");
-  const srcRaw = val("Lähde").toLowerCase();
-  let source = srcRaw.startsWith("myym") ? "store" : srcRaw.startsWith("tilaus") ? "order" : "whatsapp";
-  if(/ÖZEL\s+S[İIi]PAR[İIi]Ş/i.test(`${work} ${note}`)) source = "order";
-  const status = source !== "whatsapp" ? "active" : (/geldi/i.test(note) ? "arrived" : "waiting");
-  const price = Number(String(r["Hinta (€)"] ?? "").replace(",", "."));
-  const date = val("Toimitus");
-  return {
-    name: val("Asiakas") || "Uusi asiakas",
-    phone: val("Puhelin"),
-    product: product || "Tuote",
-    work: work || "Korjaus",
-    price: isFinite(price) && price > 0 ? price : 0,
-    date: /^\d{2}\.\d{2}\.\d{4}$/.test(date) ? date : "",
-    status,
-    source,
-    loc: "",
-    img: bag,
-    note,
-    customer_note: ""
-  };
-}
-
-function loadSheetJs(){
-  if(window.XLSX) return Promise.resolve();
-  return new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
-    s.onload = resolve;
-    s.onerror = () => reject(new Error("SheetJS lataus epäonnistui"));
-    document.head.appendChild(s);
-  });
-}
-
-async function handleWaImport(e){
-  const file = e.target.files?.[0];
-  e.target.value = "";
-  if(!file) return;
-  try{
-    await loadSheetJs();
-    const wb = XLSX.read(await file.arrayBuffer(), { type: "array" });
-    const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: "" });
-    const seen = new Set(jobs.map(waImportKey));
-    const fresh = [];
-    rows.forEach(r => {
-      const j = waJobFromRow(r);
-      if(!j) return;
-      const key = waImportKey(j);
-      if(seen.has(key)) return;
-      seen.add(key);
-      fresh.push(j);
-    });
-    if(!fresh.length){
-      alert("Tuotavia tilauksia ei löytynyt. Kaikki rivit ovat jo järjestelmässä tai ne ovat tyhjiä.");
-      return;
-    }
-    if(!confirm(`${fresh.length} tilausta tuodaan Excelistä. Jatketaanko?`)) return;
-    fresh.forEach(j => {
-      j.id = "#" + jobIdSeq;
-      jobIdSeq++;
-      jobs.unshift(j);
-      dbInsertJob(j);
-    });
-    saveState();
-    renderHome();
-    renderJobs();
-    alert(`${fresh.length} tilausta tuotu.`);
-  }catch(err){
-    console.error("Excel import failed:", err);
-    alert("Tuonti epäonnistui. Tarkista tiedosto ja yritä uudelleen.");
-  }
 }
 
 function openJob(id){
