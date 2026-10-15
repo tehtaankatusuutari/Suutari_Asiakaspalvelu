@@ -626,7 +626,8 @@ function openIntake(prefill=null){
   <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()"></div>
   <div class="field"><label id="workLabel">Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
   <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"><small id="priceHint" style="display:none;color:var(--teal);font-weight:600;"></small></div>
-  <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" min="${localISO(new Date())}" oninput="document.getElementById('dateHint').style.display='none';"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
+  <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" min="${localISO(new Date())}" oninput="document.getElementById('dateHint').style.display='none';renderIntakeDayPicker();"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
+  <div class="field full"><label>Valitse toimituspäivä</label><div id="intakeDayPicker" class="dp-wrap"></div></div>
   <div class="field full"><label>Hylly / sijainti</label><input id="loc" value="A1-01" placeholder="A3-07"></div>
   <div class="field full">
     <label>Kuva</label>
@@ -653,6 +654,64 @@ function openIntake(prefill=null){
 </div>`;
   document.getElementById("modal").classList.remove("hidden");
   toggleSourceFields();
+  intakePickerMonth = null;
+  renderIntakeDayPicker();
+}
+
+// Compact month grid next to the delivery date: each day shows how many jobs
+// already land there, colored with the same density scale as the calendar.
+// Sundays and past days are disabled; clicking a day fills the date field.
+let intakePickerMonth = null;
+function renderIntakeDayPicker(){
+  const host = document.getElementById("intakeDayPicker");
+  const input = document.getElementById("date");
+  if(!host || !input) return;
+  const selected = input.value ? parseIsoDate(input.value) : null;
+  if(!intakePickerMonth){
+    const base = selected || new Date();
+    intakePickerMonth = { y: base.getFullYear(), m: base.getMonth() };
+  }
+  const { y, m } = intakePickerMonth;
+  const stats = jobStatsByDate();
+  const today = new Date(); today.setHours(0,0,0,0);
+  const leading = (new Date(y, m, 1).getDay() + 6) % 7;
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  let cells = "";
+  for(let i=0;i<leading;i++) cells += '<span class="dp-blank"></span>';
+  for(let d=1; d<=daysInMonth; d++){
+    const dt = new Date(y, m, d);
+    const iso = localISO(dt);
+    const count = stats[toFinDateStr(dt)]?.count || 0;
+    const closed = dt.getDay() === 0 || dt < today;
+    const cls = [closed ? "dp-off" : calendarDensityClass(count), iso === input.value ? "dp-sel" : ""].join(" ");
+    cells += `<button type="button" class="dp-cell ${cls}" ${closed ? "disabled" : ""} onclick="pickIntakeDay('${iso}')"><span>${d}</span><small>${count || ""}</small></button>`;
+  }
+  host.innerHTML = `
+    <div class="dp-head">
+      <button type="button" class="dp-nav" onclick="shiftIntakePicker(-1)">◄</button>
+      <b>${monthNamesFi[m]} ${y}</b>
+      <button type="button" class="dp-nav" onclick="shiftIntakePicker(1)">►</button>
+    </div>
+    <div class="dp-grid dp-names">${["Ma","Ti","Ke","To","Pe","La","Su"].map(n => `<span>${n}</span>`).join("")}</div>
+    <div class="dp-grid">${cells}</div>`;
+}
+
+function parseIsoDate(iso){
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(y, m-1, d);
+}
+
+function pickIntakeDay(iso){
+  const input = document.getElementById("date");
+  input.value = iso;
+  document.getElementById("dateHint").style.display = "none";
+  renderIntakeDayPicker();
+}
+
+function shiftIntakePicker(delta){
+  const base = new Date(intakePickerMonth.y, intakePickerMonth.m + delta, 1);
+  intakePickerMonth = { y: base.getFullYear(), m: base.getMonth() };
+  renderIntakeDayPicker();
 }
 
 async function saveJob(addAnother = false){
