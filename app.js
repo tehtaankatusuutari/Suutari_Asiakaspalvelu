@@ -1413,6 +1413,7 @@ function openJob(id){
       </div>
     </div>
     <div class="detail"><b style="font-size:11px">Työnkulku</b><div class="timeline">${jobTimelineHtml(j)}</div>
+      ${j.source==="whatsapp" && j.status==="waiting" ? `<button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--teal);color:white;" onclick="setStatus('${j.id}','arrived')">📦 ASIAKAS SAAPUI — TUOTE TULI LIIKKEESEEN</button>` : ""}
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer" onclick="openStatus('${j.id}')">PÄIVITÄ TILA</button>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--primary-light);color:var(--primary);" onclick="openEditJob('${j.id}')">✏️ MUOKKAA TIETOJA</button>
       <button class="save" style="width:100%;border:0;border-radius:9px;padding:12px;margin-top:8px;cursor:pointer;background:var(--teal-light);color:var(--teal);" onclick="printReceipt('${j.id}')">🖨️ TULOSTA KUITTI</button>
