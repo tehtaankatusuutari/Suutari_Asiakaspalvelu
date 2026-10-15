@@ -2177,9 +2177,9 @@ function isoToFin(iso){
 // Teroitus, so skates is checked first.
 const JOB_CATEGORIES = [
   { key:"skates", label:"Luistimet", icon:"⛸️", words:["luisti"] },
-  { key:"shoes", label:"Kengät", icon:"👞", words:["keng","saappa","tossu"] },
-  { key:"bags", label:"Laukut", icon:"👜", words:["laukku","reppu"] },
-  { key:"sharpening", label:"Teroitus", icon:"🔪", words:["terot"] },
+  { key:"shoes", label:"Kengät", icon:"👞", words:["keng","saappa","tossu","korkolap","puolipohj","pohj","louboutin","venytys","liimau"] },
+  { key:"bags", label:"Laukut", icon:"👜", words:["laukku","laukk","reppu","kukkaro","lompakko","kassi"] },
+  { key:"sharpening", label:"Teroitus", icon:"🔪", words:["teroit"] },
   { key:"other", label:"Muu", icon:"🔧", words:[] },
 ];
 function jobCategory(j){
