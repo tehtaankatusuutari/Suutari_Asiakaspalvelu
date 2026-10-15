@@ -2299,7 +2299,7 @@ function renderReports(){
   const catMax = Math.max(1, ...Object.values(catCounts));
   document.getElementById("categoryStats").innerHTML = JOB_CATEGORIES.map(c=>{
     const n = catCounts[c.key];
-    return `<div class="source-row"><span>${c.icon} ${c.label}</span><div class="bar"><i style="width:${n/catMax*100}%"></i></div><b>${n}</b></div>`;
+    return `<div class="source-row" style="cursor:pointer;" onclick="showCategoryJobs('${c.key}')"><span>${c.icon} ${c.label}</span><div class="bar"><i style="width:${n/catMax*100}%"></i></div><b>${n}</b></div>`;
   }).join("");
 
   const revMap = dailyRevenueMap();
@@ -2401,6 +2401,18 @@ function renderReports(){
   } else {
     document.getElementById("dailyRevenueList").innerHTML = '<p style="color:var(--text-muted);font-size:12px;padding:15px 0;text-align:center;">Ei saapuneita tai luovutettuja töitä tässä kuussa.</p>';
   }
+}
+
+function showCategoryJobs(key){
+  const cat = JOB_CATEGORIES.find(c => c.key === key);
+  const list = getMonthReceivedJobs().filter(j => jobCategory(j).key === key);
+  document.getElementById("modalBody").innerHTML = `<h2>${cat.icon} ${cat.label} · ${list.length} työtä</h2>
+<p style="font-size:12px;color:#78858d">Tämän kuukauden työt, luokiteltu tuote- ja korjaustekstin perusteella.</p>
+<div style="display:grid;gap:6px;margin-top:12px;max-height:380px;overflow-y:auto;">
+  ${list.map(j => `<div class="wide-btn" style="text-align:left;"><b>${j.id} · ${j.product}</b><br><small>${j.work}</small></div>`).join("") || '<p style="color:var(--text-muted);font-size:13px;">Ei töitä.</p>'}
+</div>
+<div class="modal-actions" style="margin-top:12px;"><button class="cancel" onclick="closeModal()">Sulje</button></div>`;
+  document.getElementById("modal").classList.remove("hidden");
 }
 
 function csvRows(){let d=getExportData();return [["Työ ID","Lähde","Asiakas","Päivämäärä","Tuote","Korjaus","Tila","Hinta"],...d.map(j=>[j.id,SOURCE_META[j.source||"store"]?.label||j.source,j.name,jobCreatedDateStr(j),j.product,j.work,statusLabel[j.status]||j.status,j.price])]}
