@@ -1373,6 +1373,21 @@ function trackingUrl(id){
   return new URL(`track.html?code=${encodeURIComponent(id)}`, window.location.href).href;
 }
 
+async function purgeImportedEmptyJobs(){
+  const targets = jobs.filter(j => !j.loc && !j.date);
+  if(!targets.length){
+    alert("Poistettavia kirjauksia ei löytynyt.");
+    return;
+  }
+  if(!confirm(`${targets.length} kirjausta poistetaan pysyvästi. Jatketaanko?`)) return;
+  targets.forEach(j => dbDeleteJob(j.id));
+  jobs = jobs.filter(j => !targets.includes(j));
+  saveState();
+  renderHome();
+  renderJobs();
+  alert(`${targets.length} kirjausta poistettu.`);
+}
+
 function openJob(id){
   const j=jobs.find(x=>x.id===id);
   document.getElementById("jobNo").textContent=j.id;

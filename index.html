@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261015_1600">
+<link rel="stylesheet" href="styles.css?v=20261015_1700">
 </head>
 <body>
 
@@ -480,6 +480,9 @@
       <button class="wide-btn" onclick="saveSettings()" style="background: var(--primary); color: white; border: 0;">Tallenna asetukset</button>
       <button class="wide-btn" onclick="testConnection()" style="background: var(--teal-light); color: var(--teal); border: 1px solid var(--teal);">Testaa yhteys</button>
     </div>
+    <div style="margin-top: 12px;">
+      <button class="wide-btn" onclick="purgeImportedEmptyJobs()" style="background:#fdecec; color:#b42318; border:1px solid #b42318;">🗑️ Poista tuodut tyhjät kirjaukset (ilman sijaintia ja toimituspäivää)</button>
+    </div>
     <div id="connStatus" style="margin-top: 15px; font-size: 12px; font-weight: 600; display: none;"></div>
   </div>
 
@@ -618,6 +621,6 @@
 <div id="printReceipt"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20261015_1600"></script>
+<script src="app.js?v=20261015_1700"></script>
 </body>
 </html>
