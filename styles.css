@@ -2979,7 +2979,7 @@ main {
     bottom: 0;
     left: 0;
     right: 0;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(6, 1fr);
     background: white;
     border-top: 1px solid var(--border-color);
     padding: 10px 4px calc(10px + env(safe-area-inset-bottom));
@@ -3464,4 +3464,55 @@ img[src*="netlify"],
 .dp-cell.dp-sel {
   outline: 2px solid var(--teal);
   outline-offset: 1px;
+}
+
+.wa-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--border-light);
+}
+.wa-row:last-child {
+  border-bottom: 0;
+}
+.wa-info {
+  cursor: pointer;
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--primary);
+}
+.wa-info small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.wa-note {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wa-price {
+  font-weight: 800;
+  color: var(--primary);
+  font-size: 13px;
+}
+.wa-arrive {
+  border: 0;
+  border-radius: 9px;
+  padding: 9px 12px;
+  background: var(--teal);
+  color: #fff;
+  font-weight: 700;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.wa-empty {
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 14px 4px;
+  text-align: center;
 }

@@ -88,6 +88,7 @@
     <button class="active" data-page="home">⌂ <span>Tänään</span></button>
     <button data-page="jobs">⚒ <span>Työt</span></button>
     <button data-page="calendar">▦ <span>Kalenteri</span></button>
+    <button data-page="whatsapp">💬 <span>WhatsApp</span></button>
     <!-- Sosiaalinen Media -- pasivoitu toistaiseksi, sivu ja koodi ennallaan odottamassa jatkokehitystä -->
     <button data-page="reports">▣ <span>Raportit & Vienti</span></button>
     <button data-page="customers">♙ <span>Asiakkaat</span></button>
@@ -188,6 +189,14 @@
       </div>
     </div>
   </div>
+
+  <div class="section-title" style="margin-top:28px;">
+    <h2>💬 WhatsApp-tilaukset (odottavat)</h2>
+    <button onclick="showPage('whatsapp')">Kaikki WhatsApp →</button>
+  </div>
+  <div class="card">
+    <div id="homeWaList"></div>
+  </div>
 </section>
 
 <section id="jobs" class="page">
@@ -256,6 +265,23 @@
       <span><i style="background:#ea580c;border-radius:50%;"></i>Valmiina, odottaa noutoa</span>
     </div>
   </div>
+</section>
+
+<section id="whatsapp" class="page">
+  <div class="hero">
+    <div>
+      <div class="eyebrow">Tilaukset</div>
+      <h1>WhatsApp-tilaukset</h1>
+      <p>Tuotteet, jotka odottavat asiakkaan saapumista. Kun asiakas tulee, merkitse saapuneeksi.</p>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="quick-add" style="background:var(--teal);box-shadow:0 8px 20px rgba(19,140,140,0.15);" onclick="openIntake({source:'whatsapp'})">💬 UUSI WHATSAPP-TILAUS</button>
+      <button class="quick-add" onclick="document.getElementById('waImportFile').click()">📥 TUO EXCELISTÄ</button>
+      <input type="file" id="waImportFile" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleWaImport(event)">
+    </div>
+  </div>
+  <p id="waCount" style="font-size:12px;color:var(--primary);font-weight:600;margin:0 0 12px;"></p>
+  <div class="card" id="waList"></div>
 </section>
 
 <section id="shelves" class="page">
@@ -604,6 +630,7 @@
   <button data-page="home" class="active">⌂<small>Tänään</small></button>
   <button data-page="jobs">⚒<small>Työt</small></button>
   <button data-page="calendar">▦<small>Kalenteri</small></button>
+  <button data-page="whatsapp">💬<small>WhatsApp</small></button>
   <button data-page="reports">▣<small>Raportit</small></button>
   <button data-page="customers">♙<small>Asiakkaat</small></button>
 </nav>
@@ -618,6 +645,6 @@
 <div id="printReceipt"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20261015_1400"></script>
+<script src="app.js?v=20261015_1500"></script>
 </body>
 </html>
