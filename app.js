@@ -623,8 +623,10 @@ function openIntake(prefill=null){
   </div>
   <div class="field"><label>Asiakas</label><input id="n" value="${prefill?.name||""}" placeholder="Nimi tai kuitin numero" oninput="delete this.dataset.auto"></div>
   <div class="field"><label>Puhelin</label><input id="p" value="${prefill?.phone||""}" placeholder="040..."></div>
-  <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()"></div>
-  <div class="field"><label id="workLabel">Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()"></div>
+  <div class="field"><label>Tuote</label><input id="prod" list="tuoteOptions" value="${prefill?.product||""}" placeholder="Marimekko käsilaukku" onblur="suggestPriceFromAI()" oninput="renderQuickChips('prod')"></div>
+  <div class="field full"><div id="prodChips" class="qchips"></div></div>
+  <div class="field"><label id="workLabel">Korjaus</label><input id="work" list="korjausOptions" value="${prefill?.work||""}" placeholder="Vetoketjun vaihto" onblur="suggestPriceFromAI()" oninput="renderQuickChips('work')"></div>
+  <div class="field full"><div id="workChips" class="qchips"></div></div>
   <div class="field"><label>Hinta (€)</label><input id="price" type="number" value="45"><small id="priceHint" style="display:none;color:var(--teal);font-weight:600;"></small></div>
   <div class="field"><label>Toimitus</label><input id="date" type="date" value="${dateValue}" min="${localISO(new Date())}" oninput="document.getElementById('dateHint').style.display='none';renderIntakeDayPicker();"><small id="dateHint" style="color:var(--text-muted);${dateHint?"":"display:none;"}">${dateHint}</small></div>
   <div class="field full"><label>Valitse toimituspäivä</label><div id="intakeDayPicker" class="dp-wrap"></div></div>
@@ -656,6 +658,48 @@ function openIntake(prefill=null){
   toggleSourceFields();
   intakePickerMonth = null;
   renderIntakeDayPicker();
+  renderQuickChips("prod");
+  renderQuickChips("work");
+}
+
+// Tap-to-pick product and work buttons: the most used earlier values first,
+// then the built-in suggestions. "Muu" just focuses the text field for typing.
+function quickChoices(kind){
+  const field = kind === "prod" ? "product" : "work";
+  const listId = kind === "prod" ? "tuoteOptions" : "korjausOptions";
+  const counts = {};
+  jobs.forEach(j => {
+    const v = (j[field] || "").trim();
+    if(v) counts[v] = (counts[v] || 0) + 1;
+  });
+  const learned = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+  const base = [...document.querySelectorAll(`#${listId} option`)].map(o => o.value);
+  return [...new Set([...learned, ...base])].slice(0, 16);
+}
+
+function renderQuickChips(kind){
+  const host = document.getElementById(kind === "prod" ? "prodChips" : "workChips");
+  const input = document.getElementById(kind === "prod" ? "prod" : "work");
+  if(!host || !input) return;
+  host.replaceChildren();
+  quickChoices(kind).forEach(v => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "qchip" + (input.value.trim() === v ? " on" : "");
+    b.textContent = v;
+    b.onclick = () => {
+      input.value = v;
+      renderQuickChips(kind);
+      if(kind === "prod" || kind === "work") suggestPriceFromAI();
+    };
+    host.appendChild(b);
+  });
+  const muu = document.createElement("button");
+  muu.type = "button";
+  muu.className = "qchip qchip-new";
+  muu.textContent = "＋ Muu (kirjoita)";
+  muu.onclick = () => input.focus();
+  host.appendChild(muu);
 }
 
 // Compact month grid next to the delivery date: each day shows how many jobs
@@ -1509,7 +1553,7 @@ function starModelProfile(name){
   return { name: name || "Star-tulostin", family: match?.family || "Star", chars: match?.chars || 42 };
 }
 
-const APP_BUILD_LABEL = "Sovellus 1.0.5 · 31.10.2026 20:30";
+const APP_BUILD_LABEL = "Sovellus 1.0.6 · 31.10.2026 20:45";
 function updatePrinterStatus(){
   const build = document.getElementById("appBuildLabel");
   if(build) build.textContent = APP_BUILD_LABEL;
@@ -1728,7 +1772,7 @@ function receiptLines(j, width){
     ...wrap("Asiakas: ", j.name || "").map(t => ({ text: t })),
     ...wrap("Tuote: ", j.product || "").map(t => ({ text: t })),
     ...wrap("Korjaus: ", j.work || "").map(t => ({ text: t })),
-    ...wrap("Hinta: ", `${j.price} €`).map(t => ({ text: t })),
+    ...wrap("Hinta: ", `${j.price} EUR`).map(t => ({ text: t })),
     ...wrap("Toimitus: ", j.date || "").map(t => ({ text: t })),
     { text: "" },
     { text: "Skannaa ja seuraa tilausta:", center: true },

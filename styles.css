@@ -3465,3 +3465,29 @@ img[src*="netlify"],
   outline: 2px solid var(--teal);
   outline-offset: 1px;
 }
+
+.qchips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -4px;
+}
+.qchip {
+  border: 1px solid var(--border-color);
+  background: #fff;
+  color: var(--primary);
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.qchip.on {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.qchip-new {
+  border-style: dashed;
+  color: var(--teal);
+}
