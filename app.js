@@ -1411,10 +1411,11 @@ async function uploadDetailBeforeImage(e, id) {
   }
 }
 
-// Built from the page's own URL, not window.location.origin, because the app
-// is served from a subpath (github.io/<repo>/) and origin would drop it.
+// Customers scan this on their own phones, so it must be the public site address,
+// never the app's local address (https://localhost inside the Android app).
+const PUBLIC_APP_URL = "https://tehtaankatusuutari.github.io/Suutari_Asiakaspalvelu/";
 function trackingUrl(id){
-  return new URL(`track.html?code=${encodeURIComponent(id)}`, window.location.href).href;
+  return `${PUBLIC_APP_URL}track.html?code=${encodeURIComponent(id)}`;
 }
 
 async function purgeImportedEmptyJobs(){
@@ -1553,7 +1554,7 @@ function starModelProfile(name){
   return { name: name || "Star-tulostin", family: match?.family || "Star", chars: match?.chars || 42 };
 }
 
-const APP_BUILD_LABEL = "Sovellus 1.0.6 · 31.10.2026 20:45";
+const APP_BUILD_LABEL = "Sovellus 1.0.7 · 31.10.2026 21:00";
 function updatePrinterStatus(){
   const build = document.getElementById("appBuildLabel");
   if(build) build.textContent = APP_BUILD_LABEL;
