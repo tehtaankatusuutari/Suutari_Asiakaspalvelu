@@ -3491,3 +3491,51 @@ img[src*="netlify"],
   border-style: dashed;
   color: var(--teal);
 }
+
+.cat-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.cat-col {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  font-size: 13px;
+  color: var(--primary);
+}
+.cat-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 8px;
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+}
+.cat-item button {
+  border: 0;
+  background: none;
+  color: #b42318;
+  font-size: 16px;
+  cursor: pointer;
+}
+.cat-add {
+  display: flex;
+  gap: 6px;
+  margin-top: 4px;
+}
+.cat-add input {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+.cat-add button {
+  border: 0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: var(--teal);
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+}

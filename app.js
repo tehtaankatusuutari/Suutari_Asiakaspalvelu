@@ -355,6 +355,7 @@ async function syncFromDb() {
 
     jobs = allJobs;
     saveState();
+    await loadCatalog();
     return true;
   } catch(err) {
     console.error("Database sync failed:", err.message);
@@ -438,6 +439,7 @@ function showPage(id){
   if(id==="shelves")renderShelves();
   if(id==="social")renderSocial();
   if(id==="settings") {
+    renderCatalogSettings();
     document.getElementById("dbUrl").value = localStorage.getItem("suutari_db_url") || "";
     document.getElementById("dbKey").value = localStorage.getItem("suutari_db_key") || "";
     document.getElementById("connStatus").style.display = "none";
@@ -664,17 +666,93 @@ function openIntake(prefill=null){
 
 // Tap-to-pick product and work buttons: the most used earlier values first,
 // then the built-in suggestions. "Muu" just focuses the text field for typing.
+let catalogItems = [];
+
+async function loadCatalog(){
+  if(!supabaseClient) return;
+  try{
+    const { data, error } = await supabaseClient.from("catalog_items").select("*").order("name");
+    if(error) throw error;
+    catalogItems = data || [];
+  }catch(err){
+    console.error("Catalog load failed:", err.message || err);
+  }
+}
+
 function quickChoices(kind){
   const field = kind === "prod" ? "product" : "work";
+  const dbKind = kind === "prod" ? "product" : "work";
   const listId = kind === "prod" ? "tuoteOptions" : "korjausOptions";
   const counts = {};
   jobs.forEach(j => {
     const v = (j[field] || "").trim();
     if(v) counts[v] = (counts[v] || 0) + 1;
   });
+  const managed = catalogItems.filter(c => c.kind === dbKind).map(c => c.name);
   const learned = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
   const base = [...document.querySelectorAll(`#${listId} option`)].map(o => o.value);
-  return [...new Set([...learned, ...base])].slice(0, 16);
+  return [...new Set([...managed, ...learned, ...base])].slice(0, 20);
+}
+
+function escapeHtml(text){
+  return String(text).replace(/[&<>"']/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]));
+}
+
+function renderCatalogSettings(){
+  const host = document.getElementById("catalogSettings");
+  if(!host) return;
+  const column = (dbKind, title) => {
+    const items = catalogItems.filter(c => c.kind === dbKind);
+    const rows = items.map(c => `<div class="cat-item"><span>${escapeHtml(c.name)}</span><button type="button" onclick="removeCatalogItem('${c.id}')">×</button></div>`).join("");
+    return `<div class="cat-col">
+      <b>${title}</b>
+      ${rows || '<small style="color:var(--text-muted);">Ei lisättyjä vielä</small>'}
+      <div class="cat-add">
+        <input id="catInput-${dbKind}" placeholder="Uusi nimi" onkeydown="if(event.key==='Enter')addCatalogItem('${dbKind}')">
+        <button type="button" onclick="addCatalogItem('${dbKind}')">Lisää</button>
+      </div>
+    </div>`;
+  };
+  host.innerHTML = `<div style="font-weight:700;color:var(--primary);margin-bottom:8px;">📋 Tuote- ja korjauslista</div>
+    <p style="font-size:12px;color:var(--text-muted);margin:0 0 10px;">Nimet näkyvät uuden vastaanoton painikkeina kaikilla laitteilla.</p>
+    <div class="cat-grid">${column("product", "Tuotteet")}${column("work", "Korjaukset")}</div>`;
+}
+
+async function addCatalogItem(dbKind){
+  const input = document.getElementById(`catInput-${dbKind}`);
+  const name = input?.value.trim();
+  if(!name) return;
+  if(catalogItems.some(c => c.kind === dbKind && c.name.toLowerCase() === name.toLowerCase())){
+    input.value = "";
+    return;
+  }
+  if(!supabaseClient){
+    alert("Tietokantaan ei ole yhteyttä.");
+    return;
+  }
+  const { data, error } = await supabaseClient.from("catalog_items").insert([{ kind: dbKind, name }]).select().single();
+  if(error){
+    alert("Lisäys epäonnistui: " + error.message);
+    return;
+  }
+  catalogItems.push(data);
+  catalogItems.sort((a, b) => a.name.localeCompare(b.name, "fi"));
+  renderCatalogSettings();
+  renderQuickChips("prod");
+  renderQuickChips("work");
+}
+
+async function removeCatalogItem(id){
+  if(!confirm("Poistetaanko nimi listalta?")) return;
+  const { error } = await supabaseClient.from("catalog_items").delete().eq("id", id);
+  if(error){
+    alert("Poisto epäonnistui: " + error.message);
+    return;
+  }
+  catalogItems = catalogItems.filter(c => c.id !== id);
+  renderCatalogSettings();
+  renderQuickChips("prod");
+  renderQuickChips("work");
 }
 
 function renderQuickChips(kind){
@@ -1554,7 +1632,7 @@ function starModelProfile(name){
   return { name: name || "Star-tulostin", family: match?.family || "Star", chars: match?.chars || 42 };
 }
 
-const APP_BUILD_LABEL = "Sovellus 1.0.7 · 31.10.2026 21:00";
+const APP_BUILD_LABEL = "Sovellus 1.0.8 · 31.10.2026 21:30";
 function updatePrinterStatus(){
   const build = document.getElementById("appBuildLabel");
   if(build) build.textContent = APP_BUILD_LABEL;
