@@ -99,8 +99,7 @@ public class StarPrinterPlugin extends Plugin {
                 BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
                 adapter.cancelDiscovery();
                 BluetoothDevice device = adapter.getRemoteDevice(address);
-                BluetoothSocket s = device.createRfcommSocketToServiceRecord(SPP_UUID);
-                s.connect();
+                BluetoothSocket s = connectSocket(device);
                 socket = s;
                 out = s.getOutputStream();
                 connectedAddress = address;
@@ -111,7 +110,7 @@ public class StarPrinterPlugin extends Plugin {
                 call.resolve(result);
             } catch (Exception e) {
                 closeQuietly();
-                call.reject("Yhteys tulostimeen epäonnistui: " + e.getMessage());
+                call.reject("Yhteys tulostimeen epäonnistui (" + e.getClass().getSimpleName() + "): " + e.getMessage());
             }
         });
     }
@@ -153,6 +152,35 @@ public class StarPrinterPlugin extends Plugin {
         result.put("name", connected ? connectedName : "");
         result.put("address", connected ? connectedAddress : "");
         call.resolve(result);
+    }
+
+    // Some Star printers don't advertise the SPP service record, and some need an
+    // unsecured link; try the standard secure socket first, then the fallbacks.
+    private BluetoothSocket connectSocket(BluetoothDevice device) throws Exception {
+        IOException last = null;
+        try {
+            BluetoothSocket s = device.createRfcommSocketToServiceRecord(SPP_UUID);
+            s.connect();
+            return s;
+        } catch (IOException e) {
+            last = e;
+        }
+        try {
+            BluetoothSocket s = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
+            s.connect();
+            return s;
+        } catch (IOException e) {
+            last = e;
+        }
+        try {
+            java.lang.reflect.Method m = device.getClass().getMethod("createRfcommSocket", int.class);
+            BluetoothSocket s = (BluetoothSocket) m.invoke(device, 1);
+            s.connect();
+            return s;
+        } catch (Exception e) {
+            if (last != null) throw last;
+            throw e;
+        }
     }
 
     private void closeQuietly() {

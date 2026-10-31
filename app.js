@@ -1610,7 +1610,7 @@ async function connectNativePrinter(plugin, address, silent){
     return true;
   }catch(err){
     console.error("Native printer connect failed:", err);
-    if(!silent) alert("Tulostimeen ei saatu yhteyttä. Varmista, että tulostin on päällä ja parittu Android-asetuksista.");
+    if(!silent) alert(`Tulostimeen ei saatu yhteyttä. Varmista, että tulostin on päällä, parittu Android-asetuksista eikä Zettle ole yhdistettynä siihen.\n\nTekninen tieto: ${err.message || err}`);
     return false;
   }
 }
