@@ -1495,11 +1495,25 @@ function printReceipt(id){
 const STAR_USB_VENDOR_ID = 0x0519;
 let starPrinter = null;
 
+// Star's USB ID covers every model, so detection is by name only to choose the
+// paper width. Unknown names fall back to 80 mm, the most common Star receipt size.
+const STAR_MODEL_FAMILIES = [
+  { re: /SM-S2/i, family: "SM-S2xx", chars: 30 },
+  { re: /TSP/i, family: "TSP-sarja", chars: 42 },
+  { re: /mC-Print/i, family: "mC-Print", chars: 42 },
+  { re: /SM-T/i, family: "SM-T-sarja", chars: 42 },
+  { re: /mPOP/i, family: "mPOP", chars: 42 },
+];
+function starModelProfile(name){
+  const match = STAR_MODEL_FAMILIES.find(f => f.re.test(name || ""));
+  return { name: name || "Star-tulostin", family: match?.family || "Star", chars: match?.chars || 42 };
+}
+
 function updatePrinterStatus(){
   const el = document.getElementById("printerStatus");
   if(!el) return;
   el.textContent = starPrinter
-    ? `✅ Yhdistetty: ${starPrinter.device.productName || "Star-tulostin"}`
+    ? `✅ Yhdistetty: ${starPrinter.model.name} (${starPrinter.model.family}, ${starPrinter.model.chars} merkkiä/rivi)`
     : "Ei yhdistetty — fiset tulostetaan selaimen tulostusikkunan kautta.";
 }
 
@@ -1512,7 +1526,7 @@ async function openStarPrinter(device){
       if(!out) continue;
       await device.claimInterface(iface.interfaceNumber);
       if(alt.alternateSetting) await device.selectAlternateInterface(iface.interfaceNumber, alt.alternateSetting);
-      starPrinter = { device, endpoint: out.endpointNumber };
+      starPrinter = { device, endpoint: out.endpointNumber, model: starModelProfile(device.productName) };
       updatePrinterStatus();
       return;
     }
@@ -1559,7 +1573,7 @@ function encodeCp858(text){
 }
 
 function buildEscPosReceipt(j){
-  const width = 42;
+  const width = starPrinter?.model.chars || 42;
   const wrap = (label, value) => {
     const line = `${label}${value}`;
     const out = [];
