@@ -1509,7 +1509,7 @@ function starModelProfile(name){
   return { name: name || "Star-tulostin", family: match?.family || "Star", chars: match?.chars || 42 };
 }
 
-const APP_BUILD_LABEL = "Sovellus 1.0.4 · 31.10.2026 20:05";
+const APP_BUILD_LABEL = "Sovellus 1.0.5 · 31.10.2026 20:30";
 function updatePrinterStatus(){
   const build = document.getElementById("appBuildLabel");
   if(build) build.textContent = APP_BUILD_LABEL;
@@ -1701,8 +1701,16 @@ function encodeCp858(text){
   return bytes;
 }
 
-function buildEscPosReceipt(j){
-  const width = starPrinter?.model.chars || 42;
+const ESC = 0x1B, GS = 0x1D;
+// Star Line mode: ESC GS y commands print a QR code, ESC d cuts the paper.
+const CODE_PAGE_CANDIDATES = [
+  { label: "ESC t 19", bytes: [ESC, 0x74, 19] },
+  { label: "ESC GS t 19", bytes: [ESC, GS, 0x74, 19] },
+  { label: "ESC t 16", bytes: [ESC, 0x74, 16] },
+  { label: "ESC t 2", bytes: [ESC, 0x74, 2] },
+];
+
+function receiptLines(j, width){
   const wrap = (label, value) => {
     const line = `${label}${value}`;
     const out = [];
@@ -1711,7 +1719,7 @@ function buildEscPosReceipt(j){
   };
   const now = new Date();
   const stamp = `${String(now.getDate()).padStart(2,"0")}.${String(now.getMonth()+1).padStart(2,"0")}.${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
-  const lines = [
+  return [
     { text: "TEHTAANKATU SUUTARI", center: true, bold: true },
     { text: "Atelier Flow", center: true },
     { text: stamp, center: true },
@@ -1723,25 +1731,69 @@ function buildEscPosReceipt(j){
     ...wrap("Hinta: ", `${j.price} €`).map(t => ({ text: t })),
     ...wrap("Toimitus: ", j.date || "").map(t => ({ text: t })),
     { text: "" },
-    { text: "Seuraa tilausta:", center: true },
-    { text: trackingUrl(j.id), center: true },
-    { text: "" },
-    { text: "Kiitos, kun toit työn meille!", center: true, bold: true },
+    { text: "Skannaa ja seuraa tilausta:", center: true },
   ];
-  const ESC = 0x1B, GS = 0x1D;
-  const bytes = [ESC, 0x40, ESC, 0x74, 19];
-  for(const line of lines){
-    bytes.push(ESC, 0x61, line.center ? 1 : 0);
-    bytes.push(ESC, 0x45, line.bold ? 1 : 0);
-    bytes.push(...encodeCp858(line.text), 0x0A);
-  }
+}
+
+function pushText(bytes, line){
+  bytes.push(ESC, 0x61, line.center ? 1 : 0);
+  bytes.push(ESC, 0x45, line.bold ? 1 : 0);
+  bytes.push(...encodeCp858(line.text), 0x0A);
+}
+
+function pushQr(bytes, data){
+  const payload = Array.from(new TextEncoder().encode(data));
+  const len = payload.length;
+  bytes.push(ESC, 0x61, 1);
+  bytes.push(ESC, GS, 0x79, 0x53, 0x30, 0x02);
+  bytes.push(ESC, GS, 0x79, 0x53, 0x31, 0x01);
+  bytes.push(ESC, GS, 0x79, 0x53, 0x32, 0x04);
+  bytes.push(ESC, GS, 0x79, 0x44, 0x31, 0x00, len & 0xFF, (len >> 8) & 0xFF, ...payload);
+  bytes.push(ESC, GS, 0x79, 0x50, 0x0A, ESC, 0x61, 0);
+}
+
+function pushCut(bytes){
+  bytes.push(0x0A, 0x0A, 0x0A, ESC, 0x64, 0x03);
+}
+
+function buildEscPosReceipt(j, codePage = CODE_PAGE_CANDIDATES[0]){
+  const width = starPrinter?.model.chars || 42;
+  const bytes = [ESC, 0x40, ...codePage.bytes];
+  for(const line of receiptLines(j, width)) pushText(bytes, line);
+  pushQr(bytes, trackingUrl(j.id));
+  pushText(bytes, { text: "Kiitos, kun toit työn meille!", center: true, bold: true });
   bytes.push(ESC, 0x45, 0, ESC, 0x61, 0);
-  bytes.push(0x0A, 0x0A, 0x0A, GS, 0x56, 0x42, 0x00);
+  pushCut(bytes);
+  return new Uint8Array(bytes);
+}
+
+function buildCodePageTest(){
+  const bytes = [];
+  for(const cp of CODE_PAGE_CANDIDATES){
+    bytes.push(ESC, 0x40, ...cp.bytes);
+    pushText(bytes, { text: `${cp.label}:` });
+    pushText(bytes, { text: "äöå ÄÖÅ é € ü" });
+    bytes.push(0x0A);
+  }
+  pushCut(bytes);
   return new Uint8Array(bytes);
 }
 
 async function printEscPosReceipt(j){
   await sendToStarPrinter(buildEscPosReceipt(j));
+}
+
+async function printCodePageTest(){
+  if(!starPrinter){
+    alert("Tulostinta ei ole yhdistetty.");
+    return;
+  }
+  try{
+    await sendToStarPrinter(buildCodePageTest());
+  }catch(err){
+    console.error("Code page test failed:", err);
+    alert("Merkistötestitulostus epäonnistui.");
+  }
 }
 
 async function testStarPrint(){
