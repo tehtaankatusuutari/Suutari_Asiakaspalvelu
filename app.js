@@ -1477,8 +1477,143 @@ function buildReceiptHtml(j){
 function printReceipt(id){
   const j = jobs.find(x=>x.id===id);
   if(!j) return;
+  if(starPrinter){
+    printEscPosReceipt(j).catch(err => {
+      console.error("Star print failed:", err);
+      alert("Tulostin ei vastannut. Avataan selaimen tulostusikkuna.");
+      document.getElementById("printReceipt").innerHTML = buildReceiptHtml(j);
+      window.print();
+    });
+    return;
+  }
   document.getElementById("printReceipt").innerHTML = buildReceiptHtml(j);
   window.print();
+}
+
+// Star Micronics thermal printers use USB vendor ID 0x0519. A printer the user
+// has already allowed is found again on page load without any dialog.
+const STAR_USB_VENDOR_ID = 0x0519;
+let starPrinter = null;
+
+function updatePrinterStatus(){
+  const el = document.getElementById("printerStatus");
+  if(!el) return;
+  el.textContent = starPrinter
+    ? `✅ Yhdistetty: ${starPrinter.device.productName || "Star-tulostin"}`
+    : "Ei yhdistetty — fiset tulostetaan selaimen tulostusikkunan kautta.";
+}
+
+async function openStarPrinter(device){
+  await device.open();
+  if(device.configuration === null) await device.selectConfiguration(1);
+  for(const iface of device.configuration.interfaces){
+    for(const alt of iface.alternates){
+      const out = alt.endpoints.find(e => e.direction === "out" && e.type === "bulk");
+      if(!out) continue;
+      await device.claimInterface(iface.interfaceNumber);
+      if(alt.alternateSetting) await device.selectAlternateInterface(iface.interfaceNumber, alt.alternateSetting);
+      starPrinter = { device, endpoint: out.endpointNumber };
+      updatePrinterStatus();
+      return;
+    }
+  }
+  throw new Error("Tulostimen lähetysyhteyttä ei löytynyt");
+}
+
+async function connectStarPrinter(){
+  if(!navigator.usb){
+    alert("Tämä selain ei tue USB-tulostimia. Käytä Chrome-selainta.");
+    return;
+  }
+  try{
+    const device = await navigator.usb.requestDevice({ filters: [{ vendorId: STAR_USB_VENDOR_ID }] });
+    await openStarPrinter(device);
+  }catch(err){
+    console.error("Star printer connect failed:", err);
+    if(err.name !== "NotFoundError") alert("Tulostinta ei voitu yhdistää.");
+  }
+}
+
+async function autoConnectStarPrinter(){
+  if(!navigator.usb) return;
+  try{
+    const devices = await navigator.usb.getDevices();
+    const star = devices.find(d => d.vendorId === STAR_USB_VENDOR_ID);
+    if(star) await openStarPrinter(star);
+  }catch(err){
+    console.error("Star printer auto-connect failed:", err);
+  }
+  updatePrinterStatus();
+}
+
+// Star printers in Star Line mode accept ESC/POS-style text commands.
+// Text is encoded as CP858 so Finnish letters and the euro sign print correctly.
+const CP858_MAP = { "ä":0x84, "Ä":0x8E, "ö":0x94, "Ö":0x99, "å":0x86, "Å":0x8F, "é":0x82, "ü":0x81, "€":0xD5, "–":0x2D, "—":0x2D };
+function encodeCp858(text){
+  const bytes = [];
+  for(const ch of text){
+    const code = CP858_MAP[ch] ?? ch.charCodeAt(0);
+    bytes.push(code < 128 ? code : (CP858_MAP[ch] ?? 0x3F));
+  }
+  return bytes;
+}
+
+function buildEscPosReceipt(j){
+  const width = 42;
+  const wrap = (label, value) => {
+    const line = `${label}${value}`;
+    const out = [];
+    for(let i = 0; i < line.length; i += width) out.push(line.slice(i, i + width));
+    return out;
+  };
+  const now = new Date();
+  const stamp = `${String(now.getDate()).padStart(2,"0")}.${String(now.getMonth()+1).padStart(2,"0")}.${now.getFullYear()} ${String(now.getHours()).padStart(2,"0")}:${String(now.getMinutes()).padStart(2,"0")}`;
+  const lines = [
+    { text: "TEHTAANKATU SUUTARI", center: true, bold: true },
+    { text: "Atelier Flow", center: true },
+    { text: stamp, center: true },
+    { text: "" },
+    ...wrap("Työ: ", j.id).map(t => ({ text: t })),
+    ...wrap("Asiakas: ", j.name || "").map(t => ({ text: t })),
+    ...wrap("Tuote: ", j.product || "").map(t => ({ text: t })),
+    ...wrap("Korjaus: ", j.work || "").map(t => ({ text: t })),
+    ...wrap("Hinta: ", `${j.price} €`).map(t => ({ text: t })),
+    ...wrap("Toimitus: ", j.date || "").map(t => ({ text: t })),
+    { text: "" },
+    { text: "Seuraa tilausta:", center: true },
+    { text: trackingUrl(j.id), center: true },
+    { text: "" },
+    { text: "Kiitos, kun toit työn meille!", center: true, bold: true },
+  ];
+  const ESC = 0x1B, GS = 0x1D;
+  const bytes = [ESC, 0x40, ESC, 0x74, 19];
+  for(const line of lines){
+    bytes.push(ESC, 0x61, line.center ? 1 : 0);
+    bytes.push(ESC, 0x45, line.bold ? 1 : 0);
+    bytes.push(...encodeCp858(line.text), 0x0A);
+  }
+  bytes.push(ESC, 0x45, 0, ESC, 0x61, 0);
+  bytes.push(0x0A, 0x0A, 0x0A, GS, 0x56, 0x42, 0x00);
+  return new Uint8Array(bytes);
+}
+
+async function printEscPosReceipt(j){
+  const data = buildEscPosReceipt(j);
+  await starPrinter.device.transferOut(starPrinter.endpoint, data);
+}
+
+async function testStarPrint(){
+  if(!starPrinter){
+    alert("Tulostinta ei ole yhdistetty.");
+    return;
+  }
+  const sample = { id: "#0000", name: "Testi", product: "Testituote", work: "Testi", price: 0, date: "" };
+  try{
+    await printEscPosReceipt(sample);
+  }catch(err){
+    console.error("Test print failed:", err);
+    alert("Testitulostus epäonnistui.");
+  }
 }
 
 function openEditJob(id){
@@ -1913,6 +2048,7 @@ document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal
 // Initialize Data and UI (gated behind a real Supabase Auth session — see checkAuth())
 let currentUser = null;
 checkAuth();
+autoConnectStarPrinter();
 
 // Catches the closing-time (18:00) threshold for sessions left open across
 // it, without needing a reload — see rolloverOverdueDates().
