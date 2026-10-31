@@ -1509,7 +1509,7 @@ function starModelProfile(name){
   return { name: name || "Star-tulostin", family: match?.family || "Star", chars: match?.chars || 42 };
 }
 
-const APP_BUILD_LABEL = "Sovellus 1.0.3 · 31.10.2026 19:48";
+const APP_BUILD_LABEL = "Sovellus 1.0.4 · 31.10.2026 20:05";
 function updatePrinterStatus(){
   const build = document.getElementById("appBuildLabel");
   if(build) build.textContent = APP_BUILD_LABEL;

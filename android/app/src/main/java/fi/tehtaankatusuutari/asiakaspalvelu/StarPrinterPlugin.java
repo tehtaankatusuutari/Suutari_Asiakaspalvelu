@@ -97,7 +97,6 @@ public class StarPrinterPlugin extends Plugin {
             closeQuietly();
             try {
                 BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-                adapter.cancelDiscovery();
                 BluetoothDevice device = adapter.getRemoteDevice(address);
                 BluetoothSocket s = connectSocket(device);
                 socket = s;
