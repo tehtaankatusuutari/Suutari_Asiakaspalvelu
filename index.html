@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="styles.css?v=20261031_1000">
+<link rel="stylesheet" href="styles.css?v=20261031_1200">
 </head>
 <body>
 
@@ -486,8 +486,19 @@
     <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color);">
       <div style="font-weight: 700; color: var(--primary); margin-bottom: 8px;">🖨️ Tulostin (kuitit)</div>
       <div id="printerStatus" style="font-size: 12px; color: var(--text-muted); margin-bottom: 10px;">Ei yhdistetty — fiset tulostetaan selaimen tulostusikkunan kautta.</div>
+      <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px; font-size: 12px;">
+        <label for="printerModel" style="font-weight: 600; color: var(--primary);">Bluetooth-malli</label>
+        <select id="printerModel" onchange="saveStarModel(this.value)" style="padding: 8px; border: 1px solid var(--border-color); border-radius: 8px;">
+          <option value="mC-Print3" selected>mC-Print3 (80 mm)</option>
+          <option value="mC-Print2">mC-Print2 (80 mm)</option>
+          <option value="TSP143III">TSP143III (80 mm)</option>
+          <option value="SM-S230i">SM-S230i (58 mm)</option>
+          <option value="SM-T300i">SM-T300i (80 mm)</option>
+        </select>
+      </div>
       <div style="display: flex; gap: 10px; flex-wrap: wrap;">
         <button class="wide-btn" onclick="connectStarPrinter()" style="background: var(--teal-light); color: var(--teal); border: 1px solid var(--teal);">Yhdistä Star-tulostin (USB)</button>
+        <button class="wide-btn" onclick="connectStarBluetooth()" style="background: var(--teal-light); color: var(--teal); border: 1px solid var(--teal);">Yhdistä Bluetooth-tulostin</button>
         <button class="wide-btn" onclick="testStarPrint()" style="background: var(--bg-main); color: var(--primary); border: 1px solid var(--border-color);">Testitulostus</button>
       </div>
     </div>
@@ -629,6 +640,6 @@
 <div id="printReceipt"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="app.js?v=20261031_1100"></script>
+<script src="app.js?v=20261031_1200"></script>
 </body>
 </html>

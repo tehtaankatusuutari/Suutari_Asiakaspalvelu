@@ -1513,7 +1513,7 @@ function updatePrinterStatus(){
   const el = document.getElementById("printerStatus");
   if(!el) return;
   el.textContent = starPrinter
-    ? `✅ Yhdistetty: ${starPrinter.model.name} (${starPrinter.model.family}, ${starPrinter.model.chars} merkkiä/rivi)`
+    ? `✅ Yhdistetty (${starPrinter.transport === "usb" ? "USB" : "Bluetooth"}): ${starPrinter.model.name} (${starPrinter.model.family}, ${starPrinter.model.chars} merkkiä/rivi)`
     : "Ei yhdistetty — fiset tulostetaan selaimen tulostusikkunan kautta.";
 }
 
@@ -1526,7 +1526,7 @@ async function openStarPrinter(device){
       if(!out) continue;
       await device.claimInterface(iface.interfaceNumber);
       if(alt.alternateSetting) await device.selectAlternateInterface(iface.interfaceNumber, alt.alternateSetting);
-      starPrinter = { device, endpoint: out.endpointNumber, model: starModelProfile(device.productName) };
+      starPrinter = { transport: "usb", device, endpoint: out.endpointNumber, model: starModelProfile(device.productName) };
       updatePrinterStatus();
       return;
     }
@@ -1549,15 +1549,69 @@ async function connectStarPrinter(){
 }
 
 async function autoConnectStarPrinter(){
-  if(!navigator.usb) return;
+  const savedModel = localStorage.getItem("suutari_printer_model");
+  const modelSelect = document.getElementById("printerModel");
+  if(savedModel && modelSelect) modelSelect.value = savedModel;
   try{
-    const devices = await navigator.usb.getDevices();
-    const star = devices.find(d => d.vendorId === STAR_USB_VENDOR_ID);
-    if(star) await openStarPrinter(star);
+    if(navigator.usb){
+      const devices = await navigator.usb.getDevices();
+      const star = devices.find(d => d.vendorId === STAR_USB_VENDOR_ID);
+      if(star) await openStarPrinter(star);
+    }
+    if(!starPrinter && navigator.serial && localStorage.getItem("suutari_printer_transport") === "serial"){
+      const ports = await navigator.serial.getPorts();
+      if(ports[0]) await openStarSerialPort(ports[0]);
+    }
   }catch(err){
     console.error("Star printer auto-connect failed:", err);
   }
   updatePrinterStatus();
+}
+
+// Paired Bluetooth printers (Star Classic/SPP, e.g. mC-Print3) show up as serial
+// ports. The port name doesn't carry the model, so the model is picked in Asetukset.
+function selectedStarModel(){
+  const saved = localStorage.getItem("suutari_printer_model") || "mC-Print3";
+  const select = document.getElementById("printerModel");
+  const name = select ? select.value : saved;
+  return starModelProfile(name);
+}
+
+async function openStarSerialPort(port){
+  await port.open({ baudRate: 115200 });
+  starPrinter = { transport: "serial", port, writer: port.writable.getWriter(), model: selectedStarModel() };
+  localStorage.setItem("suutari_printer_transport", "serial");
+  updatePrinterStatus();
+}
+
+async function connectStarBluetooth(){
+  if(!navigator.serial){
+    alert("Tämä selain ei tue Bluetooth-tulostimia. Käytä Chrome-selainta.");
+    return;
+  }
+  try{
+    const port = await navigator.serial.requestPort();
+    await openStarSerialPort(port);
+  }catch(err){
+    console.error("Star Bluetooth connect failed:", err);
+    if(err.name !== "NotFoundError") alert("Bluetooth-tulostinta ei voitu yhdistää. Varmista, että tulostin on parittu koneen Bluetooth-asetuksista.");
+  }
+}
+
+function saveStarModel(name){
+  localStorage.setItem("suutari_printer_model", name);
+  if(starPrinter){
+    starPrinter.model = starModelProfile(name);
+    updatePrinterStatus();
+  }
+}
+
+async function sendToStarPrinter(data){
+  if(starPrinter.transport === "usb"){
+    await starPrinter.device.transferOut(starPrinter.endpoint, data);
+  }else{
+    await starPrinter.writer.write(data);
+  }
 }
 
 // Star printers in Star Line mode accept ESC/POS-style text commands.
@@ -1612,8 +1666,7 @@ function buildEscPosReceipt(j){
 }
 
 async function printEscPosReceipt(j){
-  const data = buildEscPosReceipt(j);
-  await starPrinter.device.transferOut(starPrinter.endpoint, data);
+  await sendToStarPrinter(buildEscPosReceipt(j));
 }
 
 async function testStarPrint(){
