@@ -1,0 +1,16 @@
+{
+  "name": "suutari-asiakaspalvelu",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:www": "sh scripts/build-www.sh",
+    "android:sync": "sh scripts/build-www.sh && npx cap sync android"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.3",
+    "@capacitor/core": "^6.2.3"
+  },
+  "devDependencies": {
+    "@capacitor/cli": "^6.2.3"
+  }
+}

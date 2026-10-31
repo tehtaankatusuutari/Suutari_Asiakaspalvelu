@@ -1513,7 +1513,7 @@ function updatePrinterStatus(){
   const el = document.getElementById("printerStatus");
   if(!el) return;
   el.textContent = starPrinter
-    ? `✅ Yhdistetty (${starPrinter.transport === "usb" ? "USB" : "Bluetooth"}): ${starPrinter.model.name} (${starPrinter.model.family}, ${starPrinter.model.chars} merkkiä/rivi)`
+    ? `✅ Yhdistetty (${{ usb: "USB", serial: "Bluetooth", native: "Bluetooth (Android)" }[starPrinter.transport]}): ${starPrinter.model.name} (${starPrinter.model.family}, ${starPrinter.model.chars} merkkiä/rivi)`
     : "Ei yhdistetty — fiset tulostetaan selaimen tulostusikkunan kautta.";
 }
 
@@ -1535,6 +1535,10 @@ async function openStarPrinter(device){
 }
 
 async function connectStarPrinter(){
+  if(nativeStarPlugin()){
+    alert("Android-sovelluksessa käytä Bluetooth-tulostinta.");
+    return;
+  }
   if(!navigator.usb){
     alert("Tämä selain ei tue USB-tulostimia. Käytä Chrome-selainta.");
     return;
@@ -1548,10 +1552,21 @@ async function connectStarPrinter(){
   }
 }
 
+function nativeStarPlugin(){
+  return window.Capacitor?.isNativePlatform?.() ? window.Capacitor.Plugins.StarPrinter : null;
+}
+
 async function autoConnectStarPrinter(){
   const savedModel = localStorage.getItem("suutari_printer_model");
   const modelSelect = document.getElementById("printerModel");
   if(savedModel && modelSelect) modelSelect.value = savedModel;
+  const plugin = nativeStarPlugin();
+  if(plugin){
+    const address = localStorage.getItem("suutari_native_printer_address");
+    if(address) await connectNativePrinter(plugin, address, true);
+    updatePrinterStatus();
+    return;
+  }
   try{
     if(navigator.usb){
       const devices = await navigator.usb.getDevices();
@@ -1584,7 +1599,62 @@ async function openStarSerialPort(port){
   updatePrinterStatus();
 }
 
+let nativeDeviceChoices = [];
+
+async function connectNativePrinter(plugin, address, silent){
+  try{
+    const info = await plugin.connect({ address });
+    starPrinter = { transport: "native", plugin, name: info.name, model: selectedStarModel() };
+    localStorage.setItem("suutari_native_printer_address", address);
+    updatePrinterStatus();
+    return true;
+  }catch(err){
+    console.error("Native printer connect failed:", err);
+    if(!silent) alert("Tulostimeen ei saatu yhteyttä. Varmista, että tulostin on päällä ja parittu Android-asetuksista.");
+    return false;
+  }
+}
+
+async function pickNativePrinter(index){
+  const device = nativeDeviceChoices[index];
+  closeModal();
+  if(device) await connectNativePrinter(nativeStarPlugin(), device.address, false);
+}
+
+async function showNativePrinterPicker(plugin){
+  const { devices } = await plugin.listPaired();
+  if(!devices.length){
+    alert("Paritettuja Bluetooth-laitteita ei löytynyt. Pari tulostin ensin Android-asetuksista.");
+    return;
+  }
+  nativeDeviceChoices = devices;
+  document.getElementById("modalBody").innerHTML = `<h2>🖨️ Valitse tulostin</h2>
+<div style="display:grid;gap:8px;margin-top:12px;">
+  ${devices.map((d, i) => `<button class="wide-btn" style="text-align:left;" onclick="pickNativePrinter(${i})"><b>${d.name}</b><br><small>${d.address}</small></button>`).join("")}
+</div>
+<div class="modal-actions" style="margin-top:12px;"><button class="cancel" onclick="closeModal()">Peruuta</button></div>`;
+  document.getElementById("modal").classList.remove("hidden");
+}
+
+function bytesToBase64(bytes){
+  let binary = "";
+  for(let i = 0; i < bytes.length; i += 0x8000){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(binary);
+}
+
 async function connectStarBluetooth(){
+  const plugin = nativeStarPlugin();
+  if(plugin){
+    try{
+      await showNativePrinterPicker(plugin);
+    }catch(err){
+      console.error("Native printer list failed:", err);
+      alert(err.message || "Bluetooth-laitteita ei voitu hakea.");
+    }
+    return;
+  }
   if(!navigator.serial){
     alert("Tämä selain ei tue Bluetooth-tulostimia. Käytä Chrome-selainta.");
     return;
@@ -1607,7 +1677,9 @@ function saveStarModel(name){
 }
 
 async function sendToStarPrinter(data){
-  if(starPrinter.transport === "usb"){
+  if(starPrinter.transport === "native"){
+    await starPrinter.plugin.print({ data: bytesToBase64(data) });
+  }else if(starPrinter.transport === "usb"){
     await starPrinter.device.transferOut(starPrinter.endpoint, data);
   }else{
     await starPrinter.writer.write(data);
